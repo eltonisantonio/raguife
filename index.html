@@ -219,7 +219,14 @@
         <label class="check"><input type="checkbox" id="e-mod-premio">Prêmio Individual</label>
       </div>
     </div>
-    <div class="field"><label>Departamentos do gestor (Individual) — separados por vírgula</label><input type="text" id="e-deptos" placeholder="ex.: ENSAQUE, EXPEDICAO"></div>
+    <div class="field"><label>Departamentos do gestor (Individual)</label>
+      <div id="e-deptos-box" class="checks" style="max-height:170px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+      <input type="text" id="e-deptos-extra" placeholder="+ adicionar outro (separe por vírgula)" style="margin-top:8px">
+    </div>
+    <div class="field"><label>Setores do Variável (para não-administradores) — vazio = todos</label>
+      <div id="e-setores-box" class="checks" style="max-height:170px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+      <input type="text" id="e-setores-extra" placeholder="+ adicionar outro (separe por vírgula)" style="margin-top:8px">
+    </div>
     <div class="field"><label>Páginas do Variável (para não-administradores)</label>
       <div class="checks">
         <label class="check"><input type="checkbox" id="e-pg-lanc">Lançamento</label>
@@ -546,7 +553,10 @@ function openEditUsuario(uid){
   $('e-self-note').style.display=ehEu?'block':'none';
   $('e-mod-variavel').checked=(u.modulos||[]).includes('variavel');
   $('e-mod-premio').checked=(u.modulos||[]).includes('premio');
-  $('e-deptos').value=(u.deptos||[]).join(', ');
+  $('e-deptos-extra').value='';
+  eBuildDeptos(u.deptos||[]);
+  $('e-setores-extra').value='';
+  eBuildSetores(u.setores||[]);
   const pg=u.paginas||[];
   $('e-pg-lanc').checked=pg.includes('var.lancamento');
   $('e-pg-5s').checked=pg.includes('var.5s');
@@ -565,7 +575,8 @@ async function salvarEdicaoUsuario(){
   if($('e-mod-variavel').checked) modulos.push('variavel');
   if($('e-mod-premio').checked) modulos.push('premio');
   if(!admin && modulos.length===0){ toast('Marque ao menos um acesso','error'); return; }
-  const deptos=$('e-deptos').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const deptos=eColetarDeptos();
+  const setores=eColetarSetores();
   const paginas=[];
   if($('e-pg-lanc').checked) paginas.push('var.lancamento');
   if($('e-pg-5s').checked) paginas.push('var.5s');
@@ -573,8 +584,8 @@ async function salvarEdicaoUsuario(){
   if($('e-pg-painel').checked) paginas.push('var.painel');
   $('btn-salvar-e').disabled=true;
   try{
-    await db.collection('usuarios').doc(uid).update({ nome, admin, modulos, deptos, paginas });
-    if(ehEu){ currentUser={...currentUser, nome, admin, modulos, deptos, paginas}; buildNav(); $('sb-name').textContent=nome; }
+    await db.collection('usuarios').doc(uid).update({ nome, admin, modulos, deptos, paginas, setores });
+    if(ehEu){ currentUser={...currentUser, nome, admin, modulos, deptos, paginas, setores}; buildNav(); $('sb-name').textContent=nome; }
     fecharEdicao(); toast('Usuário atualizado');
   }catch(e){ toast(traduzErro(e),'error'); }
   finally{ $('btn-salvar-e').disabled=false; }
@@ -1241,7 +1252,7 @@ function vSetorTemInds(s){
 }
 function vRenderSetorChips(){
   const cont=$('v-setor-chips'); if(!cont) return;
-  const setores=vSetoresModulo(varMod).filter(vSetorTemInds);
+  const setores=vSetoresModulo(varMod).filter(vSetorTemInds).filter(vSetorPermitido);
   if(!setores.length){
     varSetor=null; cont.innerHTML='<span style="font-size:13px;color:var(--text3)">Nenhum indicador cadastrado para este módulo.</span>';
     const lc=$('v-lanc-card'); if(lc) lc.style.display='none'; return;
@@ -1546,8 +1557,8 @@ function renderVar5sSst(){
 }
 function vFecharModal(id){ const m=$(id); if(m) m.classList.remove('show'); }
 function vSetorOpts(){
-  const adm=varDB.setores.adm.map(s=>`<option value="${s}">[ADM] ${s}</option>`).join('');
-  const ind=varDB.setores.industria.map(s=>`<option value="${s}">[OP] ${s}</option>`).join('');
+  const adm=varDB.setores.adm.filter(vSetorPermitido).map(s=>`<option value="${s}">[ADM] ${s}</option>`).join('');
+  const ind=varDB.setores.industria.filter(vSetorPermitido).map(s=>`<option value="${s}">[OP] ${s}</option>`).join('');
   return `<optgroup label="Administrativo">${adm}</optgroup><optgroup label="Operação">${ind}</optgroup>`;
 }
 
@@ -1743,6 +1754,7 @@ function vRenderPainel(){
           <option value="semestral" ${vPainelMod==='semestral'?'selected':''}>Semestral</option>
           <option value="anual" ${vPainelMod==='anual'?'selected':''}>Anual</option>
         </select>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="vImprimirPainel()">🖨 PDF</button>
       </div>
     </div>
     <div class="kpis" id="v-painel-kpis"></div>
@@ -1758,7 +1770,7 @@ function vRenderPainel(){
   const combos=[];
   const modulos = vPainelMod?[vPainelMod]:['adm','industria','trimestral','semestral','anual'];
   modulos.forEach(mod=>{
-    vSetoresModulo(mod).forEach(setor=>{
+    vSetoresModulo(mod).filter(vSetorPermitido).forEach(setor=>{
       const inds=varDB.indicadores.filter(i=>i.setor===setor && i.periodicidade===((mod==='adm'||mod==='industria')?'mensal':mod) && (mod==='adm'?i.modulo==='adm':mod==='industria'?i.modulo==='industria':true));
       const turnos=[...new Set(inds.filter(i=>i.turno).map(i=>i.turno))];
       if(turnos.length===0){
@@ -2103,12 +2115,36 @@ function foParseFunc(rows,fname){
   let hr=-1;
   for(let i=0;i<Math.min(15,rows.length);i++){ if(rows[i].some(v=>String(v).trim()==='Chapa')){ hr=i; break; } }
   if(hr===-1){ toast('Arquivo não reconhecido como FoRelaFunc2','error'); return; }
+  const N=s=>String(s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  const col={};
+  rows[hr].forEach((cell,idx)=>{ const h=N(cell);
+    if(h==='CHAPA'&&col.chapa===undefined) col.chapa=idx;
+    else if(h==='NOME'&&col.nome===undefined) col.nome=idx;
+    else if((h.startsWith('REFERENCIA')||h==='REF'||h==='REF.'||h.startsWith('MATRICULA'))&&col.ref===undefined) col.ref=idx;
+    else if((h.startsWith('FUNCAO')||h==='CARGO')&&col.cargo===undefined) col.cargo=idx;
+    else if(h.startsWith('FAIXA')&&col.faixa===undefined) col.faixa=idx;
+    else if((h.startsWith('DEPTO')||h.startsWith('DEPARTAMENTO')||h.startsWith('SETOR'))&&col.depto===undefined) col.depto=idx;
+    else if((h.startsWith('ESCALA')||h.startsWith('TURNO'))&&col.escala===undefined) col.escala=idx;
+  });
+  // defaults (compatível com layout antigo por posição), caso algum cabeçalho não seja encontrado
+  if(col.chapa===undefined) col.chapa=0;
+  if(col.nome===undefined) col.nome=1;
+  if(col.ref===undefined) col.ref=2;
+  if(col.cargo===undefined) col.cargo=3;
+  if(col.faixa===undefined) col.faixa=4;
+  if(col.depto===undefined) col.depto=5;
+  if(col.escala===undefined) col.escala=6;
   foFuncs=[];
   for(let i=hr+1;i<rows.length;i++){
-    const r=rows[i]; const chapa=String(r[0]||'').trim();
-    if(!/^\d{5,}$/.test(chapa)) continue;
-    const nome=String(r[1]||'').trim(); if(!nome) continue;
-    foFuncs.push({ chapa, nome, ref:String(r[2]||'').trim(), cargo:String(r[3]||'').trim(), faixa:String(r[4]||'A').trim()||'A', depto:String(r[5]||'').trim(), escala:String(r[6]||'').trim() });
+    const r=rows[i]; const chapa=String(r[col.chapa]||'').trim();
+    if(!/^\d{4,}$/.test(chapa)) continue;
+    const nome=String(r[col.nome]||'').trim(); if(!nome) continue;
+    foFuncs.push({ chapa, nome,
+      ref:String(r[col.ref]||'').trim(),
+      cargo:String(r[col.cargo]||'').trim(),
+      faixa:String(r[col.faixa]||'A').trim()||'A',
+      depto:String(r[col.depto]||'').trim(),
+      escala:String(r[col.escala]||'').trim() });
   }
   foMarcar('fu-func',fname+' — '+foFuncs.length+' funcionários');
   foPersistir(); toast(foFuncs.length+' funcionários importados');
@@ -2547,6 +2583,7 @@ function pRenderImport(){
       <h3>2. Ocorrências (opcional)</h3><div class="card-sub">Planilha com dias/faltas/atestados/advertências/suspensão por referência.</div>
       <div id="p-ocorr-lbl" style="font-size:12px;color:var(--text3);margin-top:6px">Clique para selecionar o .xlsx</div>
       <input type="file" accept=".xlsx,.xls" style="display:none" onchange="pImportOcorr(this)"></label>
+    <div class="card"><div class="card-sub" style="margin-bottom:8px">Modelo já com a lista de funcionários, para preencher dias, faltas, atestados, advertências e suspensão e reimportar acima.</div><button class="btn btn-ghost" onclick="pBaixarModeloOcorr()">⬇ Baixar modelo de ocorrências</button></div>
     <div id="p-ocorr-msg"></div>`;
 }
 function pImportFunc(input){
@@ -3334,6 +3371,149 @@ async function dashCarregar(){
         </table></div>
       </div>`;
   }catch(e){ console.warn(e); root.innerHTML='<div class="card"><div class="empty-state">Não foi possível carregar o painel agora.</div></div>'; }
+}
+
+</script>
+<script>
+/* ===================================================================
+   AJUSTES — modelo de ocorrências, PDF do painel, seletor de departamentos
+   =================================================================== */
+
+/* ---------- (2) Modelo de ocorrências do Individual ---------- */
+function pBaixarModeloOcorr(){
+  const funcs=(pComp().funcs)||[];
+  if(!funcs.length){ toast('Importe o FoRelaFunc2 primeiro','error'); return; }
+  const header=['Referência','Nome','Função','Dias trabalhados','Faltas','Atestados (dias)','Advertências (qtd)','Suspensão (dias)'];
+  const linhas=funcs.map(f=>[f.ref,f.nome,f.funcao,'','','','','']);
+  const ws=XLSX.utils.aoa_to_sheet([header,...linhas]);
+  ws['!cols']=[{wch:13},{wch:34},{wch:26},{wch:16},{wch:9},{wch:16},{wch:18},{wch:16}];
+  const instr=XLSX.utils.aoa_to_sheet([
+    ['COMO PREENCHER'],[],
+    ['1. Não altere as colunas Referência, Nome e Função (já preenchidas).'],
+    ['2. Preencha Dias trabalhados de cada funcionário (proporcional = dias ÷ '+premDB.cfg.divisor+').'],
+    ['3. Faltas: qualquer valor maior que 0 zera o prêmio.'],
+    ['4. Atestados (dias): descontam do proporcional.'],
+    ['5. Advertências: 0, 1 (paga 50%) ou 2+ (zera o prêmio).'],
+    ['6. Suspensão (dias): qualquer valor maior que 0 zera o prêmio.'],
+    ['7. Ao reimportar, estes dados substituem o que estiver lançado.']
+  ]);
+  instr['!cols']=[{wch:92}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Ocorrências');
+  XLSX.utils.book_append_sheet(wb,instr,'Instruções');
+  XLSX.writeFile(wb,`Ocorrencias_${pPkey()}.xlsx`);
+  toast('Modelo gerado');
+}
+
+/* ---------- (3) PDF do Painel de Gestores (Variável) ---------- */
+function vImprimirPainel(){
+  const tabela=document.querySelector('#v-folha-inner table');
+  const kpis=document.getElementById('v-painel-kpis');
+  if(!tabela){ toast('Nada para imprimir','error'); return; }
+  const modLabel = vPainelMod ? ({adm:'Administrativo',industria:'Operação',trimestral:'Trimestral',semestral:'Semestral',anual:'Anual'}[vPainelMod]||vPainelMod) : 'Todos os módulos';
+  const titulo=`Painel de Gestores — ${vPeriodLabel()} — ${modLabel}`;
+  const w=window.open('','_blank','width=1100,height=800');
+  if(!w){ toast('Permita pop-ups para gerar o PDF','error'); return; }
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,'Segoe UI',sans-serif;font-size:12px;color:#111;padding:24px}
+    h1{font-size:18px;font-weight:700;margin-bottom:4px;color:#024f2b}
+    .sub{font-size:12px;color:#666;margin-bottom:18px}
+    .kpis{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+    .stat-card{border:1px solid #ddd;border-radius:8px;padding:10px 14px;min-width:130px}
+    .stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#888}
+    .stat-value{font-size:18px;font-weight:800;margin-top:3px}
+    .stat-sub{font-size:10px;color:#999;margin-top:2px}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{background:#f4f4f0;font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:.4px;padding:8px 10px;text-align:left;border-bottom:2px solid #ddd}
+    td{padding:7px 10px;border-bottom:1px solid #eee;vertical-align:middle}
+    .mono{font-variant-numeric:tabular-nums}
+    .badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600}
+    .badge-green{background:#dcfce7;color:#166534}
+    .badge-blue{background:#dbeafe;color:#1d4ed8}
+    .badge-amber{background:#fef9c3;color:#854d0e}
+    .badge-red{background:#fee2e2;color:#991b1b}
+    .badge-gray{background:#f3f4f6;color:#374151}
+    @media print{ body{padding:12px} @page{margin:1.2cm;size:A4 landscape} }
+  </style></head><body>
+    <h1>${titulo}</h1>
+    <div class="sub">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+    ${kpis?kpis.outerHTML:''}
+    ${tabela.outerHTML}
+    <scr`+`ipt>setTimeout(()=>window.print(),400);<\/scr`+`ipt>
+  </body></html>`);
+  w.document.close();
+}
+
+/* ---------- (4) Seletor de departamentos do gestor (checkbox) ---------- */
+async function eBuildDeptos(selected){
+  selected=(selected||[]).map(s=>String(s).trim()).filter(Boolean);
+  const box=document.getElementById('e-deptos-box'); if(!box) return;
+  box.innerHTML='<div style="font-size:12px;color:var(--text3)">Carregando departamentos…</div>';
+  let lista=[];
+  try{
+    let pdb=(typeof premDB!=='undefined'&&premDB)?premDB:null;
+    if(!pdb){ const snap=await PREM_REF.get(); pdb=premEnsure(premParse(snap.exists?snap.data():{})); }
+    const set=new Set();
+    Object.values(pdb.comps||{}).forEach(c=>(c.funcs||[]).forEach(f=>{ if(f.depto) set.add(String(f.depto).trim()); }));
+    lista=[...set].sort((a,b)=>a.localeCompare(b));
+  }catch(e){}
+  selected.forEach(s=>{ if(!lista.some(x=>x.toUpperCase()===s.toUpperCase())) lista.push(s); });
+  if(!lista.length){ box.innerHTML='<div style="font-size:12px;color:var(--text3)">Nenhum departamento ainda. Importe o FoRelaFunc2 no Individual, ou digite manualmente abaixo.</div>'; return; }
+  box.innerHTML=lista.map(d=>{
+    const ck=selected.some(s=>s.toUpperCase()===d.toUpperCase());
+    const v=String(d).replace(/"/g,'&quot;');
+    return `<label class="check"><input type="checkbox" class="e-dep-chk" value="${v}" ${ck?'checked':''}> ${d}</label>`;
+  }).join('');
+}
+function eColetarDeptos(){
+  const checked=[...document.querySelectorAll('.e-dep-chk:checked')].map(c=>c.value);
+  const ex=document.getElementById('e-deptos-extra');
+  const extra=(ex?ex.value:'').split(',').map(s=>s.trim()).filter(Boolean);
+  return [...new Set([...checked,...extra])];
+}
+
+</script>
+<script>
+/* ===================================================================
+   RESTRIÇÃO DE SETORES DO VARIÁVEL POR USUÁRIO
+   Admin vê todos. Sem setores atribuídos = vê todos. Caso contrário, só os seus.
+   =================================================================== */
+
+function vSetorPermitido(s){
+  if(currentUser.admin) return true;
+  const lista=currentUser.setores;
+  if(!lista || !lista.length) return true;     // sem restrição definida = todos
+  return lista.includes(s);
+}
+
+/* ---- seletor de setores no modal de usuário ---- */
+async function eBuildSetores(selected){
+  selected=(selected||[]).map(s=>String(s).trim()).filter(Boolean);
+  const box=document.getElementById('e-setores-box'); if(!box) return;
+  box.innerHTML='<div style="font-size:12px;color:var(--text3)">Carregando setores…</div>';
+  let adm=[],ind=[];
+  try{
+    let vdb=(typeof varDB!=='undefined'&&varDB)?varDB:null;
+    if(!vdb){ const snap=await VAR_REF.get(); vdb=varEnsure(vParse(snap.exists?snap.data():{})); }
+    adm=(vdb.setores.adm||[]).slice(); ind=(vdb.setores.industria||[]).slice();
+  }catch(e){}
+  const mk=(s,tag)=>{ const ck=selected.some(x=>x.toUpperCase()===s.toUpperCase()); const v=String(s).replace(/"/g,'&quot;');
+    return `<label class="check"><input type="checkbox" class="e-set-chk" value="${v}" ${ck?'checked':''}> <span style="font-size:10px;color:var(--text3)">[${tag}]</span> ${s}</label>`; };
+  let html='';
+  if(adm.length) html+='<div style="font-size:11px;font-weight:700;color:var(--text2);margin:2px 0 4px">Administrativo</div>'+adm.map(s=>mk(s,'ADM')).join('');
+  if(ind.length) html+='<div style="font-size:11px;font-weight:700;color:var(--text2);margin:10px 0 4px">Operação</div>'+ind.map(s=>mk(s,'OP')).join('');
+  const known=[...adm,...ind].map(x=>x.toUpperCase());
+  const extras=selected.filter(s=>!known.includes(s.toUpperCase()));
+  if(extras.length) html+='<div style="font-size:11px;font-weight:700;color:var(--text2);margin:10px 0 4px">Outros</div>'+extras.map(s=>mk(s,'?')).join('');
+  box.innerHTML=html||'<div style="font-size:12px;color:var(--text3)">Nenhum setor cadastrado no Variável.</div>';
+}
+function eColetarSetores(){
+  const checked=[...document.querySelectorAll('.e-set-chk:checked')].map(c=>c.value);
+  const ex=document.getElementById('e-setores-extra');
+  const extra=(ex?ex.value:'').split(/[,;]/).map(s=>s.trim()).filter(Boolean);
+  return [...new Set([...checked,...extra])];
 }
 
 </script>
