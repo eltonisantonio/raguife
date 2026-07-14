@@ -643,9 +643,16 @@ function vAplicarCompetenciaAberta(){
   return c;
 }
 function vCompLockCardHtml(comp){
-  return comp
-    ? `<div class="card"><div class="periodo-sel"><span style="font-size:12px;font-weight:600;color:var(--text2)">Competência (travada pelo RH):</span><span class="badge badge-green" style="margin-left:auto">🔒 ${vPeriodLabel()}</span></div></div>`
-    : `<div class="card"><div class="fatal-banner" style="background:#fff8ec;border-color:#f5d9a8;color:var(--amber);margin:0">⏳ Nenhuma competência aberta pelo RH. Libere o lançamento na aba <b>Lançamento</b> para registrar 5S / SST.</div></div>`;
+  const nota = comp
+    ? 'Competência liberada pelo RH na aba Lançamento.'
+    : 'Nenhuma competência liberada — usando o período selecionado pelo RH na aba Lançamento. Os lançamentos de 5S / SST continuam abertos.';
+  return `<div class="card">
+    <div class="periodo-sel">
+      <span style="font-size:12px;font-weight:600;color:var(--text2)">Competência (definida pelo RH no Lançamento):</span>
+      <span class="badge ${comp?'badge-green':'badge-gray'}" style="margin-left:auto">🔒 ${vPeriodLabel()}</span>
+    </div>
+    <div class="card-sub" style="margin:8px 0 0">${nota}</div>
+  </div>`;
 }
 
 /* ---------- helpers de formatação (iguais ao original) ---------- */
@@ -1618,14 +1625,12 @@ function v5sRenderHist(){
 }
 function vAbrirModalAud(){
   if(!vCanReg('5s')) return;
-  if(!vCompetenciaAberta()){ toast('Nenhuma competência aberta pelo RH','error'); return; }
   $('v-aud-setor').innerHTML=vSetorOpts();
   $('v-aud-nota').value=''; $('v-aud-auditor').value='';
   $('v-modal-aud').classList.add('show');
 }
 function vSalvarAud(){
   if(!vCanReg('5s')) return;
-  if(!vCompetenciaAberta()){ toast('Nenhuma competência aberta pelo RH','error'); return; }
   const setor=$('v-aud-setor').value;
   const nota=parseFloat($('v-aud-nota').value);
   const auditor=$('v-aud-auditor').value.trim();
@@ -1658,14 +1663,12 @@ function vSstRender(){
 }
 function vAbrirModalInc(){
   if(!vCanReg('sst')) return;
-  if(!vCompetenciaAberta()){ toast('Nenhuma competência aberta pelo RH','error'); return; }
   $('v-inc-setor').innerHTML=vSetorOpts();
   $('v-inc-desc').value='';
   $('v-modal-inc').classList.add('show');
 }
 function vSalvarInc(){
   if(!vCanReg('sst')) return;
-  if(!vCompetenciaAberta()){ toast('Nenhuma competência aberta pelo RH','error'); return; }
   const setor=$('v-inc-setor').value;
   const tipo=$('v-inc-tipo').value, desc=$('v-inc-desc').value.trim();
   varDB.sst_incidentes.push({ id:Date.now().toString(), setor, tipo, desc, periodo:vPkey(), ts:Date.now() });
@@ -3060,11 +3063,20 @@ async function renderPremioAdmin(){
       </div>
     </div>
     <div class="card">
-      <h3>Acompanhamento por gestor</h3>
-      <div class="card-sub">Quantos funcionários cada gestor já lançou e se finalizou.</div>
+      <h3>Cobertura do lançamento</h3>
+      <div class="card-sub">O que importa é o funcionário estar lançado — não quem lançou. Gestores que dividem o mesmo departamento contam uma vez só.</div>
+      <div id="pa-resumo" style="margin:10px 0 4px"></div>
       <div class="tbl-wrap" style="margin-top:8px"><table>
-        <thead><tr><th>Gestor</th><th>Departamentos</th><th>Funcion.</th><th>Lançados</th><th>Status</th><th></th></tr></thead>
-        <tbody id="pa-tbody"><tr><td colspan="6" class="empty-state">Carregando gestores…</td></tr></tbody>
+        <thead><tr><th>Departamento</th><th>Gestores</th><th>Funcion.</th><th>Lançados</th><th>Status</th></tr></thead>
+        <tbody id="pa-tbody"><tr><td colspan="5" class="empty-state">Carregando…</td></tr></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h3>Gestores</h3>
+      <div class="card-sub">Apenas para acompanhar quem já finalizou e reabrir se necessário.</div>
+      <div class="tbl-wrap" style="margin-top:8px"><table>
+        <thead><tr><th>Gestor</th><th>Departamentos</th><th>Status</th><th></th></tr></thead>
+        <tbody id="pa-gest-tbody"><tr><td colspan="4" class="empty-state">Carregando gestores…</td></tr></tbody>
       </table></div>
     </div>`;
 
@@ -3073,25 +3085,49 @@ async function renderPremioAdmin(){
   try{ const snap=await db.collection('usuarios').get(); snap.forEach(d=>usuarios.push({uid:d.id,...d.data()})); }
   catch(e){}
   const gestores=usuarios.filter(u=>!u.admin && (u.modulos||[]).includes('premio') && (u.deptos||[]).length);
+
+  const lancado=f=>c.atg[f.ref]!==undefined && c.atg[f.ref]!=='';
+
+  /* ---- cobertura por departamento (funcionário único, sem duplicar por gestor) ---- */
   const tb=$('pa-tbody'); if(!tb) return;
-  const cobertos=new Set();
-  const rows=gestores.sort((a,z)=>(a.nome||'').localeCompare(z.nome||'')).map(g=>{
-    const deptos=(g.deptos||[]).map(pNorm);
-    const meus=(c.funcs||[]).filter(f=>deptos.includes(pNorm(f.depto)));
-    meus.forEach(f=>cobertos.add(f.ref));
-    const lancados=meus.filter(f=>c.atg[f.ref]!==undefined && c.atg[f.ref]!=='').length;
-    const fin=!!(c.finalizados&&c.finalizados[g.uid]);
-    const status=fin?'<span class="badge badge-green">Finalizado</span>':lancados>0?'<span class="badge badge-amber">Em andamento</span>':'<span class="badge badge-gray">Não iniciado</span>';
-    const acao=fin&&!c.fechamento?`<button class="btn btn-ghost btn-sm" onclick="pReabrirGestor('${g.uid}')">Reabrir</button>`:'';
-    return `<tr><td style="font-weight:600">${g.nome||g.email}</td><td style="font-size:11px;color:var(--text2)">${(g.deptos||[]).join(', ')}</td><td class="mono">${meus.length}</td><td class="mono" style="color:${lancados===meus.length&&meus.length>0?'var(--green)':'var(--text1)'}">${lancados}/${meus.length}</td><td>${status}</td><td>${acao}</td></tr>`;
+  const deptos=[...new Set((c.funcs||[]).map(f=>f.depto||'(sem depto)'))].sort((a,z)=>a.localeCompare(z));
+  const rows=deptos.map(d=>{
+    const funcs=(c.funcs||[]).filter(f=>(f.depto||'(sem depto)')===d);
+    const lanc=funcs.filter(lancado).length;
+    const resp=gestores.filter(g=>(g.deptos||[]).map(pNorm).includes(pNorm(d)));
+    const respLabel=resp.length?resp.map(g=>g.nome||g.email).join(', ')
+      :'<span style="color:var(--amber);font-weight:600">Sem gestor</span>';
+    const status = lanc===funcs.length&&funcs.length>0 ? '<span class="badge badge-green">Completo</span>'
+      : lanc>0 ? `<span class="badge badge-amber">Faltam ${funcs.length-lanc}</span>`
+      : '<span class="badge badge-gray">Não iniciado</span>';
+    return `<tr>
+      <td style="font-weight:600">${d}</td>
+      <td style="font-size:11px;color:var(--text2)">${respLabel}</td>
+      <td class="mono">${funcs.length}</td>
+      <td class="mono" style="color:${lanc===funcs.length&&funcs.length>0?'var(--green)':'var(--text1)'}">${lanc}/${funcs.length}</td>
+      <td>${status}</td>
+    </tr>`;
   });
-  // funcionários sem gestor cobrindo o depto
-  const semGestor=(c.funcs||[]).filter(f=>!cobertos.has(f.ref));
-  if(semGestor.length){
-    const deptosSem=[...new Set(semGestor.map(f=>f.depto))].filter(Boolean);
-    rows.push(`<tr><td style="font-weight:600;color:var(--amber)">(Sem gestor)</td><td style="font-size:11px;color:var(--text3)">${deptosSem.join(', ')||'—'}</td><td class="mono">${semGestor.length}</td><td class="mono">—</td><td><span class="badge badge-amber">Sem responsável</span></td><td></td></tr>`);
-  }
-  tb.innerHTML=rows.join('')||'<tr><td colspan="6" class="empty-state">Nenhum gestor cadastrado. Atribua departamentos a um usuário em Usuários.</td></tr>';
+  tb.innerHTML=rows.join('')||'<tr><td colspan="5" class="empty-state">Nenhum funcionário importado nesta competência.</td></tr>';
+
+  const total=(c.funcs||[]).length;
+  const totalLanc=(c.funcs||[]).filter(lancado).length;
+  const pct=total?Math.round(totalLanc/total*100):0;
+  const rs=$('pa-resumo');
+  if(rs) rs.innerHTML=`<div class="kpis">
+    <div class="stat-card"><div class="stat-label">Funcionários lançados</div><div class="stat-value" style="color:${total&&totalLanc===total?'var(--green)':'var(--amber)'}">${totalLanc}/${total}</div><div class="stat-sub">${pct}% da competência</div></div>
+    <div class="stat-card"><div class="stat-label">Pendentes</div><div class="stat-value" style="color:${total-totalLanc?'var(--red)':'var(--green)'}">${total-totalLanc}</div><div class="stat-sub">sem atingimento informado</div></div>
+  </div>`;
+
+  /* ---- lista de gestores (só status/finalização) ---- */
+  const tg=$('pa-gest-tbody'); if(!tg) return;
+  const grows=gestores.sort((a,z)=>(a.nome||'').localeCompare(z.nome||'')).map(g=>{
+    const fin=!!(c.finalizados&&c.finalizados[g.uid]);
+    const status=fin?'<span class="badge badge-green">Finalizado</span>':'<span class="badge badge-gray">Em aberto</span>';
+    const acao=fin&&!c.fechamento?`<button class="btn btn-ghost btn-sm" onclick="pReabrirGestor('${g.uid}')">Reabrir</button>`:'';
+    return `<tr><td style="font-weight:600">${g.nome||g.email}</td><td style="font-size:11px;color:var(--text2)">${(g.deptos||[]).join(', ')}</td><td>${status}</td><td>${acao}</td></tr>`;
+  });
+  tg.innerHTML=grows.join('')||'<tr><td colspan="4" class="empty-state">Nenhum gestor cadastrado. Atribua departamentos a um usuário em Usuários.</td></tr>';
 }
 function pToggleLiberado(on){
   const c=pComp();
@@ -3153,7 +3189,7 @@ function renderVar5s(){
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
         <div><h3>5S — Situação do período</h3><div class="card-sub">Média &lt; 7,5 gera penalidade de −5%.</div></div>
-        ${ed&&comp?`<button class="btn btn-primary btn-sm" onclick="vAbrirModalAud()">+ Nova auditoria</button>`:''}
+        ${ed?`<button class="btn btn-primary btn-sm" onclick="vAbrirModalAud()">+ Nova auditoria</button>`:''}
       </div>
       <div class="tbl-wrap" style="margin-top:8px"><table>
         <thead><tr><th>Setor</th><th>Auditorias</th><th>Média</th><th>Penalidade</th><th>Status</th></tr></thead>
@@ -3188,7 +3224,7 @@ function renderVarSst(){
         <input type="checkbox" id="v-fatal-chk" ${varDB.acidente_fatal?'checked':''} onchange="vToggleFatal(this.checked)">
         <span style="font-weight:600;color:${varDB.acidente_fatal?'var(--red)':'var(--text1)'}">Registrar acidente fatal no período (${vPeriodLabel()})</span>
       </label>`:`<div style="margin-bottom:14px;font-size:13px;color:${varDB.acidente_fatal?'var(--red)':'var(--text2)'}">Acidente fatal: <b>${varDB.acidente_fatal?'SIM — variável zerada':'Não'}</b></div>`}
-      ${ed&&comp?`<button class="btn btn-primary btn-sm" onclick="vAbrirModalInc()">+ Registrar incidente</button>`:''}
+      ${ed?`<button class="btn btn-primary btn-sm" onclick="vAbrirModalInc()">+ Registrar incidente</button>`:''}
       <div class="tbl-wrap" style="margin-top:14px"><table>
         <thead><tr><th>Setor</th><th>Tipo</th><th>Descrição</th><th>Período</th>${ed?'<th></th>':''}</tr></thead>
         <tbody id="v-sst-tbody"></tbody></table></div>
