@@ -217,6 +217,7 @@
         <label class="check"><input type="checkbox" id="e-admin">Administrador</label>
         <label class="check"><input type="checkbox" id="e-mod-variavel">Sistema Variável</label>
         <label class="check"><input type="checkbox" id="e-mod-premio">Prêmio Individual</label>
+        <label class="check"><input type="checkbox" id="e-mod-periodico">Prêmio Periódico</label>
       </div>
     </div>
     <div class="field"><label>Departamentos do gestor (Individual)</label>
@@ -276,10 +277,12 @@ let usuariosUnsub = null;
 let usuariosCache = {};      // uid -> dados, para o modal de edição
 let varUnsub = null;         // assinatura em tempo real do módulo Variável
 let premUnsub = null;        // assinatura em tempo real do Prêmio Individual
+let qUnsub = null;           // assinatura em tempo real do Prêmio Periódico
 
 const MODULOS = [
   { id:'variavel', nome:'Sistema Variável' },
-  { id:'premio',   nome:'Prêmio Individual' }
+  { id:'premio',   nome:'Prêmio Individual' },
+  { id:'periodico', nome:'Prêmio Periódico' }
 ];
 
 /* ---------- utilidades ---------- */
@@ -337,7 +340,7 @@ async function doBootstrap(){
       bootstrapping=false; $('btn-bs').disabled=false; return;
     }
     await db.collection('usuarios').doc(cred.user.uid).set({
-      nome, email, admin:true, modulos:['variavel','premio'],
+      nome, email, admin:true, modulos:['variavel','premio','periodico'],
       setores:[], deptos:[], criadoEm:new Date().toISOString()
     });
     bootstrapping=false;
@@ -424,12 +427,14 @@ function showPage(id){
   if(usuariosUnsub){ usuariosUnsub(); usuariosUnsub=null; }
   if(varUnsub){ varUnsub(); varUnsub=null; }
   if(premUnsub){ premUnsub(); premUnsub=null; }
+  if(qUnsub){ qUnsub(); qUnsub=null; }
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const navEl=$('nav-'+id); if(navEl) navEl.classList.add('active');
   if(id==='inicio') return renderInicio();
   if(id==='usuarios') return renderUsuarios();
   if(id==='variavel') return renderVariavel();
   if(id==='premio')  return renderPremio();
+  if(id==='periodico') return renderPeriodico();
   if(id==='folha')   return renderFolha();
 }
 
@@ -479,6 +484,7 @@ function renderUsuarios(){
           <label class="check"><input type="checkbox" id="u-admin">Administrador</label>
           <label class="check"><input type="checkbox" id="u-mod-variavel">Sistema Variável</label>
           <label class="check"><input type="checkbox" id="u-mod-premio">Prêmio Individual</label>
+          <label class="check"><input type="checkbox" id="u-mod-periodico">Prêmio Periódico</label>
         </div>
       </div>
       <button class="btn btn-primary" id="btn-criar-u" onclick="criarUsuario()">Criar usuário</button>
@@ -500,7 +506,7 @@ function renderUsuarios(){
       const u=d.data(); usuariosCache[d.id]=u;
       const acesso = u.admin
         ? '<span class="tag tag-admin">Administrador</span>'
-        : (u.modulos||[]).map(m=>`<span class="tag tag-mod">${m==='variavel'?'Variável':'Prêmio'}</span>`).join('') || '<span style="color:var(--text3)">—</span>';
+        : (u.modulos||[]).map(m=>`<span class="tag tag-mod">${m==='variavel'?'Variável':m==='premio'?'Prêmio':'Periódico'}</span>`).join('') || '<span style="color:var(--text3)">—</span>';
       const ehEu = d.id===currentUser.uid;
       const btnEditar = `<button class="btn btn-ghost btn-sm" onclick="openEditUsuario('${d.id}')">Editar</button>`;
       const btnRemover = ehEu ? '' : ` <button class="btn btn-danger btn-sm" onclick="removerUsuario('${d.id}','${escapeAttr(u.nome||u.email)}')">Remover</button>`;
@@ -517,6 +523,7 @@ async function criarUsuario(){
   const modulos=[];
   if($('u-mod-variavel').checked) modulos.push('variavel');
   if($('u-mod-premio').checked) modulos.push('premio');
+  if($('u-mod-periodico').checked) modulos.push('periodico');
   if(!admin && modulos.length===0){ toast('Marque ao menos um acesso','error'); return; }
 
   $('btn-criar-u').disabled=true;
@@ -530,7 +537,7 @@ async function criarUsuario(){
     });
     await secApp.auth().signOut();
     $('u-nome').value=''; $('u-email').value=''; $('u-senha').value='';
-    $('u-admin').checked=false; $('u-mod-variavel').checked=false; $('u-mod-premio').checked=false;
+    $('u-admin').checked=false; $('u-mod-variavel').checked=false; $('u-mod-premio').checked=false; $('u-mod-periodico').checked=false;
     toast('Usuário criado');
   }catch(e){ toast(traduzErro(e),'error'); }
   finally{ $('btn-criar-u').disabled=false; }
@@ -553,6 +560,7 @@ function openEditUsuario(uid){
   $('e-self-note').style.display=ehEu?'block':'none';
   $('e-mod-variavel').checked=(u.modulos||[]).includes('variavel');
   $('e-mod-premio').checked=(u.modulos||[]).includes('premio');
+  $('e-mod-periodico').checked=(u.modulos||[]).includes('periodico');
   $('e-deptos-extra').value='';
   eBuildDeptos(u.deptos||[]);
   $('e-setores-extra').value='';
@@ -574,6 +582,7 @@ async function salvarEdicaoUsuario(){
   const modulos=[];
   if($('e-mod-variavel').checked) modulos.push('variavel');
   if($('e-mod-premio').checked) modulos.push('premio');
+  if($('e-mod-periodico').checked) modulos.push('periodico');
   if(!admin && modulos.length===0){ toast('Marque ao menos um acesso','error'); return; }
   const deptos=eColetarDeptos();
   const setores=eColetarSetores();
@@ -609,6 +618,35 @@ let varSaveTimer = null;
 
 function vHora(){ return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
 function vCanEdit(){ return !!currentUser.admin; }
+
+/* ---------- liberação do lançamento por período (RH abre/fecha para os gestores) ---------- */
+function vLiberado(){ return !!(varDB.liberados && varDB.liberados[vPkey()]); }
+function vPodeLancar(){ return !!currentUser.admin || vLiberado(); }
+function vToggleLiberado(on){
+  if(!vCanEdit()) return;
+  if(!varDB.liberados) varDB.liberados={};
+  const msg = on ? `Liberar o lançamento de ${vPeriodLabel()} para os gestores?` : `Bloquear o lançamento de ${vPeriodLabel()}? Os gestores não poderão mais lançar até liberar de novo.`;
+  if(!confirm(msg)) return;
+  if(on) varDB.liberados[vPkey()]=true; else delete varDB.liberados[vPkey()];
+  varSave(); renderVarLancamento();
+  toast(on?'Lançamento liberado':'Lançamento bloqueado');
+}
+
+/* ---------- competência travada pelo RH (5S/SST) ---------- */
+function vCompetenciaAberta(){
+  const libs=Object.keys(varDB.liberados||{}).filter(k=>varDB.liberados[k]);
+  return libs.length?libs.sort().pop():null;   // pkey (YYYY-MM) mais recente = competência aberta
+}
+function vAplicarCompetenciaAberta(){
+  const c=vCompetenciaAberta();
+  if(c){ const p=c.split('-'); varDB.periodo.ano=+p[0]; varDB.periodo.mes=+p[1]; }
+  return c;
+}
+function vCompLockCardHtml(comp){
+  return comp
+    ? `<div class="card"><div class="periodo-sel"><span style="font-size:12px;font-weight:600;color:var(--text2)">Competência (travada pelo RH):</span><span class="badge badge-green" style="margin-left:auto">🔒 ${vPeriodLabel()}</span></div></div>`
+    : `<div class="card"><div class="fatal-banner" style="background:#fff8ec;border-color:#f5d9a8;color:var(--amber);margin:0">⏳ Nenhuma competência aberta pelo RH. Libere o lançamento na aba <b>Lançamento</b> para registrar 5S / SST.</div></div>`;
+}
 
 /* ---------- helpers de formatação (iguais ao original) ---------- */
 function vFmt(v, formato){
@@ -772,7 +810,7 @@ function varDefaults(){
     },
     turnos:["1º Turno - 21:00 / 05:20","2º Turno - 05:00 / 13:20","3º Turno - 13:00 / 21:20"],
     indicadores: varDefaultIndicadores(),
-    resultados:{}, s5:{}, sst_incidentes:[]
+    resultados:{}, s5:{}, sst_incidentes:[], liberados:{}
   };
 }
 function varEnsure(d){
@@ -790,6 +828,7 @@ function varEnsure(d){
   if(!d.resultados) d.resultados={};
   if(!d.s5) d.s5={};
   if(!d.sst_incidentes) d.sst_incidentes=[];
+  if(!d.liberados) d.liberados={};
   return d;
 }
 function varSave(){
@@ -824,7 +863,7 @@ function renderVariavel(){
         <div class="row">
           <div class="field"><label>Sentido</label><select id="vi-sentido"><option value="maior">Maior é melhor ↑</option><option value="menor">Menor é melhor ↓</option></select></div>
           <div class="field"><label>Formato</label><select id="vi-formato"><option value="inteiro">Inteiro</option><option value="absoluto">Absoluto (decimais)</option><option value="decimal">Decimal (%)</option></select></div>
-          <div class="field"><label>Periodicidade</label><select id="vi-period"><option value="mensal">Mensal</option><option value="trimestral">Trimestral</option><option value="semestral">Semestral</option><option value="anual">Anual</option></select></div>
+          <div class="field"><label>Periodicidade</label><select id="vi-period" disabled><option value="mensal" selected>Mensal</option></select></div>
         </div>
         <div class="field"><label>Peso (0 a 1 — ex.: 0,40 = 40%)</label><input type="number" id="vi-peso" step="0.01" min="0" max="1" placeholder="0.40"></div>
         <div class="row">
@@ -931,7 +970,7 @@ function vRenderSetores(){
 function vRenderTurnos(){
   const ed=vCanEdit(); const tt=$('v-turnos-tbody'); if(!tt) return;
   tt.innerHTML = varDB.turnos.map((t,i)=>
-    `<tr><td style="font-size:13px">${t}</td>${ed?`<td><button class="btn btn-danger btn-sm" onclick="vRemoverTurno(${i})">Remover</button></td>`:''}</tr>`
+    `<tr><td style="font-size:13px">${t}</td>${ed?`<td style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="vEditarTurno(${i})">Editar</button><button class="btn btn-danger btn-sm" onclick="vRemoverTurno(${i})">Remover</button></td>`:''}</tr>`
   ).join('') || `<tr><td colspan="2" class="empty-state">Nenhum turno</td></tr>`;
 }
 function vRenderIndicadores(){
@@ -998,6 +1037,32 @@ function vRemoverTurno(i){
   if(!vCanEdit()) return;
   if(!confirm('Remover este turno?')) return;
   varDB.turnos.splice(i,1); vRenderTurnos(); varSave(); toast('Turno removido');
+}
+function vEditarTurno(i){
+  if(!vCanEdit()) return;
+  const atual=varDB.turnos[i];
+  const novo=prompt('Novo nome do turno:', atual);
+  if(novo===null) return;
+  const t=novo.trim();
+  if(!t||t===atual) return;
+  if(varDB.turnos.includes(t)){ toast('Já existe um turno com esse nome','error'); return; }
+  varDB.turnos[i]=t;
+  // atualiza indicadores que referenciam o turno antigo
+  (varDB.indicadores||[]).forEach(ind=>{ if(ind.turno===atual) ind.turno=t; });
+  // atualiza as chaves de resultados já lançados (a chave inclui o nome do turno)
+  Object.values(varDB.resultados||{}).forEach(porRkey=>{
+    Object.keys(porRkey).forEach(rKey=>{
+      const partes=rKey.split('||');
+      if(partes[2]===atual){
+        partes[2]=t;
+        const novaKey=partes.join('||');
+        porRkey[novaKey]=Object.assign({},porRkey[novaKey]||{},porRkey[rKey]);
+        delete porRkey[rKey];
+      }
+    });
+  });
+  if(varTurno===atual) varTurno=t;
+  vRenderTurnos(); vRenderIndicadores(); varSave(); toast('Turno atualizado');
 }
 
 /* ---------- modal de indicador ---------- */
@@ -1192,12 +1257,22 @@ function renderVarLancamento(){
         <span class="badge badge-green" style="font-size:12px">${vPeriodLabel()}</span>
       </div>
       <div class="modbar" style="margin-top:16px">
-        ${[['adm','Administrativo'],['industria','Operação'],['trimestral','Trimestral'],['semestral','Semestral'],['anual','Anual']]
+        ${[['adm','Administrativo'],['industria','Operação']]
           .map(([k,n])=>`<button class="modchip ${varMod===k?'active':''}" onclick="vSelectMod('${k}')">${n}</button>`).join('')}
       </div>
     </div>
 
     ${varDB.acidente_fatal?`<div class="fatal-banner">⚠ Acidente fatal registrado no período — resultados travados e premiação zerada.</div>`:''}
+    ${!currentUser.admin && !vLiberado() ? `<div class="fatal-banner" style="background:#fff8ec;border-color:#f5d9a8;color:var(--amber)">⏳ O RH ainda não liberou o lançamento de ${vPeriodLabel()}. Você pode consultar o histórico no Painel.</div>` : ''}
+
+    ${currentUser.admin?`<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+      <div>
+        <h3 style="margin:0">Lançamento — ${vPeriodLabel()}</h3>
+        <div class="card-sub" style="margin-bottom:0">${vLiberado()?'Liberado para os gestores lançarem.':'Bloqueado — apenas administradores podem lançar.'}</div>
+      </div>
+      ${vLiberado()?`<button class="btn btn-danger" onclick="vToggleLiberado(false)">🔒 Bloquear lançamento</button>`
+        : `<button class="btn btn-primary" onclick="vToggleLiberado(true)">🟢 Liberar lançamento p/ gestores</button>`}
+    </div>`:''}
 
     ${adm?`<div class="card" id="v-fat-card">
       <h3>Faturamento</h3>
@@ -1310,7 +1385,7 @@ function renderVarLancTable(){
   const pkey=vPkey(), rKey=vRKey();
   const saved=(varDB.resultados[pkey]||{})[rKey]||{};
   const isPeriodico=varMod==='trimestral'||varMod==='semestral'||varMod==='anual';
-  const fechado=varDB.acidente_fatal;
+  const fechado=varDB.acidente_fatal || !vPodeLancar();
 
   let html='';
   if(isPeriodico && base.length){
@@ -1396,6 +1471,7 @@ function vEnsureRes(pkey,rKey){
   if(!varDB.resultados[pkey][rKey]) varDB.resultados[pkey][rKey]={};
 }
 function vResInput(indId, valor){
+  if(!vPodeLancar()) return;
   const v=String(valor).replace(',','.');
   const pkey=vPkey(), rKey=vRKey(); vEnsureRes(pkey,rKey);
   if(v===''||isNaN(parseFloat(v))) delete varDB.resultados[pkey][rKey][indId];
@@ -1403,7 +1479,9 @@ function vResInput(indId, valor){
   vAtualizaTotaisLanc();
   varSave();
 }
-function vResBlur(indId, valor){ const pkey=vPkey(),rKey=vRKey(); vEnsureRes(pkey,rKey);
+function vResBlur(indId, valor){
+  if(!vPodeLancar()) return;
+  const pkey=vPkey(),rKey=vRKey(); vEnsureRes(pkey,rKey);
   const v=String(valor).replace(',','.');
   if(v===''||isNaN(parseFloat(v))) delete varDB.resultados[pkey][rKey][indId];
   else varDB.resultados[pkey][rKey][indId]=parseFloat(v);
@@ -1411,6 +1489,7 @@ function vResBlur(indId, valor){ const pkey=vPkey(),rKey=vRKey(); vEnsureRes(pke
 }
 function vResUpdate(){ /* placeholder */ }
 function vSalvarResPeriodico(indId, pkey, valor){
+  if(!vPodeLancar()) return;
   const rKey=vRKey(); vEnsureRes(pkey,rKey);
   const v=String(valor).replace(',','.');
   if(v===''||isNaN(parseFloat(v))) delete varDB.resultados[pkey][rKey][indId];
@@ -1418,6 +1497,7 @@ function vSalvarResPeriodico(indId, pkey, valor){
   varSave(); renderVarLancTable();
 }
 function vLimparRes(indId){
+  if(!vPodeLancar()) return;
   const pkey=vPkey(),rKey=vRKey(); vEnsureRes(pkey,rKey);
   delete varDB.resultados[pkey][rKey][indId];
   varSave(); renderVarLancTable();
@@ -1451,8 +1531,12 @@ function vFlushLanc(){
 function vCarregarFat(){
   const el=$('v-fat-valor'); if(!el) return;
   const fat=varDB.faturamento[vPkey()]; const tipo=vTipoFat();
-  const val=fat?(typeof fat==='object'?(fat[tipo]??0):fat):0;
-  el.value = val>0?val:'';
+  let val=null;
+  if(fat!==undefined && fat!==null){
+    if(typeof fat==='object'){ if(fat[tipo]!==undefined && fat[tipo]!==null) val=fat[tipo]; }
+    else val=fat; // formato antigo (número solto)
+  }
+  el.value = (val!==null && val!==undefined) ? val : '';
   const labels={mensal:'Mensal',trimestral:'Trimestral',semestral:'Semestral',anual:'Anual'};
   const lbl=$('v-fat-label'); if(lbl) lbl.textContent=`% Faturamento — ${labels[tipo]} (0 a 10%)`;
   const peso=$('v-fat-peso'); if(peso) peso.textContent=`Peso no resultado final: até ${String(vFatPesoMax(tipo)).replace('.',',')}% (multiplicador ×${String(vFatMult(tipo)).replace('.',',')}).`;
@@ -1483,78 +1567,6 @@ function vSalvarFat(){
    5S (auditorias) + SST (incidentes) + Acidente fatal
    =================================================================== */
 
-function renderVar5sSst(){
-  const ed=vCanEdit();
-  const anoAtual=new Date().getFullYear();
-  const anos=[]; for(let a=anoAtual-2;a<=anoAtual+1;a++) anos.push(a);
-  const c=$('var-content');
-  c.innerHTML=`
-    <div class="card">
-      <div class="periodo-sel">
-        <span style="font-size:12px;font-weight:600;color:var(--text2)">Período:</span>
-        <select onchange="varDB.periodo.mes=+this.value;varSave();renderVar5sSst()">${vMESES.map((m,i)=>`<option value="${i+1}" ${varDB.periodo.mes===i+1?'selected':''}>${m}</option>`).join('')}</select>
-        <select onchange="varDB.periodo.ano=+this.value;varSave();renderVar5sSst()">${anos.map(a=>`<option ${varDB.periodo.ano===a?'selected':''}>${a}</option>`).join('')}</select>
-        <span class="badge badge-green" style="margin-left:auto">${vPeriodLabel()}</span>
-      </div>
-    </div>
-
-    <!-- ===== SST / Acidente fatal ===== -->
-    <div class="card" style="${varDB.acidente_fatal?'border-color:#f5c6c2;background:#fffafa':''}">
-      <h3>SST — Segurança</h3>
-      <div class="card-sub">Incidente por setor: −5% no período. Acidente fatal: zera toda a variável (−100%).</div>
-      ${ed?`<label class="check" style="margin:6px 0 14px">
-        <input type="checkbox" id="v-fatal-chk" ${varDB.acidente_fatal?'checked':''} onchange="vToggleFatal(this.checked)">
-        <span style="font-weight:600;color:${varDB.acidente_fatal?'var(--red)':'var(--text1)'}">Registrar acidente fatal no período (${vPeriodLabel()})</span>
-      </label>`:`<div style="margin-bottom:14px;font-size:13px;color:${varDB.acidente_fatal?'var(--red)':'var(--text2)'}">Acidente fatal: <b>${varDB.acidente_fatal?'SIM — variável zerada':'Não'}</b></div>`}
-      ${ed?`<button class="btn btn-primary btn-sm" onclick="vAbrirModalInc()">+ Registrar incidente</button>`:''}
-      <div class="tbl-wrap" style="margin-top:14px"><table>
-        <thead><tr><th>Setor</th><th>Data</th><th>Tipo</th><th>Descrição</th><th>Período</th>${ed?'<th></th>':''}</tr></thead>
-        <tbody id="v-sst-tbody"></tbody></table></div>
-    </div>
-
-    <!-- ===== 5S situação ===== -->
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-        <div><h3>5S — Situação do período</h3><div class="card-sub">Média &lt; 7,5 gera penalidade de −5%.</div></div>
-        ${ed?`<button class="btn btn-primary btn-sm" onclick="vAbrirModalAud()">+ Nova auditoria</button>`:''}
-      </div>
-      <div class="tbl-wrap" style="margin-top:8px"><table>
-        <thead><tr><th>Setor</th><th>Auditorias</th><th>Média</th><th>Penalidade</th><th>Status</th></tr></thead>
-        <tbody id="v-5s-tbody"></tbody></table></div>
-    </div>
-
-    <!-- ===== 5S histórico ===== -->
-    <div class="card">
-      <h3>5S — Histórico de auditorias</h3>
-      <div class="tbl-wrap" style="margin-top:8px"><table>
-        <thead><tr><th>Setor</th><th>Nota</th><th>Data</th><th>Auditor</th><th>Período</th>${ed?'<th></th>':''}</tr></thead>
-        <tbody id="v-5s-hist-tbody"></tbody></table></div>
-    </div>
-
-    <!-- ===== modais ===== -->
-    <div class="modal-bg" id="v-modal-aud"><div class="modal">
-      <h3>Nova auditoria 5S</h3>
-      <div class="field"><label>Setor</label><select id="v-aud-setor"></select></div>
-      <div class="row">
-        <div class="field"><label>Nota (0 a 10)</label><input type="number" id="v-aud-nota" step="0.1" min="0" max="10"></div>
-        <div class="field"><label>Data</label><input type="date" id="v-aud-data"></div>
-      </div>
-      <div class="field"><label>Auditor (opcional)</label><input type="text" id="v-aud-auditor"></div>
-      <div class="modal-actions"><button class="btn btn-ghost" onclick="vFecharModal('v-modal-aud')">Cancelar</button><button class="btn btn-primary" onclick="vSalvarAud()">Salvar</button></div>
-    </div></div>
-
-    <div class="modal-bg" id="v-modal-inc"><div class="modal">
-      <h3>Registrar incidente SST</h3>
-      <div class="field"><label>Setor</label><select id="v-inc-setor"></select></div>
-      <div class="row">
-        <div class="field"><label>Data</label><input type="date" id="v-inc-data"></div>
-        <div class="field"><label>Tipo</label><select id="v-inc-tipo"><option>Acidente por Ato Inseguro</option></select></div>
-      </div>
-      <div class="field"><label>Descrição (opcional)</label><input type="text" id="v-inc-desc"></div>
-      <div class="modal-actions"><button class="btn btn-ghost" onclick="vFecharModal('v-modal-inc')">Cancelar</button><button class="btn btn-primary" onclick="vSalvarInc()">Salvar</button></div>
-    </div></div>`;
-  v5sRenderSituacao(); v5sRenderHist(); vSstRender();
-}
 function vFecharModal(id){ const m=$(id); if(m) m.classList.remove('show'); }
 function vSetorOpts(){
   const adm=varDB.setores.adm.filter(vSetorPermitido).map(s=>`<option value="${s}">[ADM] ${s}</option>`).join('');
@@ -1596,32 +1608,31 @@ function v5sRenderHist(){
     const [setor,periodo]=key.split('||');
     (varDB.s5[key]||[]).forEach((a,i)=>all.push({...a,setor,periodo,key,idx:i}));
   });
-  all.sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  all.sort((a,b)=>((b.ts||Date.parse(b.data)||0)-(a.ts||Date.parse(a.data)||0)));
   tb.innerHTML=all.length?all.map(a=>`<tr>
     <td style="font-weight:500">${a.setor}</td>
     <td class="mono" style="font-weight:700;color:${a.nota>=7.5?'var(--green)':'var(--red)'}">${a.nota.toFixed(1)}</td>
-    <td>${a.data}</td><td>${a.auditor||'—'}</td><td><span class="badge badge-gray">${a.periodo}</span></td>
+    <td>${a.auditor||'—'}</td><td><span class="badge badge-gray">${a.periodo}</span></td>
     ${ed?`<td><button class="btn btn-danger btn-sm" onclick="vRemoverAud('${vEsc(a.key)}',${a.idx})">×</button></td>`:''}
-  </tr>`).join(''):`<tr><td colspan="${ed?6:5}" class="empty-state">Nenhuma auditoria registrada</td></tr>`;
+  </tr>`).join(''):`<tr><td colspan="${ed?5:4}" class="empty-state">Nenhuma auditoria registrada</td></tr>`;
 }
 function vAbrirModalAud(){
   if(!vCanReg('5s')) return;
+  if(!vCompetenciaAberta()){ toast('Nenhuma competência aberta pelo RH','error'); return; }
   $('v-aud-setor').innerHTML=vSetorOpts();
-  $('v-aud-data').value=new Date().toISOString().split('T')[0];
   $('v-aud-nota').value=''; $('v-aud-auditor').value='';
   $('v-modal-aud').classList.add('show');
 }
 function vSalvarAud(){
   if(!vCanReg('5s')) return;
+  if(!vCompetenciaAberta()){ toast('Nenhuma competência aberta pelo RH','error'); return; }
   const setor=$('v-aud-setor').value;
   const nota=parseFloat($('v-aud-nota').value);
-  const data=$('v-aud-data').value;
   const auditor=$('v-aud-auditor').value.trim();
   if(isNaN(nota)||nota<0||nota>10){ toast('Nota inválida (0–10)','error'); return; }
-  if(!data){ toast('Informe a data','error'); return; }
   const key=`${setor}||${vPkey()}`;
   if(!varDB.s5[key]) varDB.s5[key]=[];
-  varDB.s5[key].push({nota,data,auditor});
+  varDB.s5[key].push({nota,auditor,ts:Date.now()});
   varSave(); vFecharModal('v-modal-aud');
   v5sRenderSituacao(); v5sRenderHist(); toast('Auditoria registrada');
 }
@@ -1636,28 +1647,28 @@ function vRemoverAud(key,idx){
 /* ---------- SST ---------- */
 function vSstRender(){
   const tb=$('v-sst-tbody'); if(!tb) return; const ed=vCanReg('sst');
-  const incs=[...(varDB.sst_incidentes||[])].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  const incs=[...(varDB.sst_incidentes||[])].sort((a,b)=>((b.ts||Date.parse(b.data)||0)-(a.ts||Date.parse(a.data)||0)));
   tb.innerHTML=incs.length?incs.map(inc=>`<tr>
-    <td style="font-weight:500">${inc.setor}</td><td>${inc.data}</td>
+    <td style="font-weight:500">${inc.setor}</td>
     <td><span class="badge badge-red">${inc.tipo||'Acidente por Ato Inseguro'}</span></td>
     <td style="font-size:12px;color:var(--text2)">${inc.desc||'—'}</td>
     <td><span class="badge badge-gray">${inc.periodo}</span></td>
     ${ed?`<td><button class="btn btn-danger btn-sm" onclick="vRemoverInc('${vEsc(inc.id)}')">×</button></td>`:''}
-  </tr>`).join(''):`<tr><td colspan="${ed?6:5}" class="empty-state">Nenhum incidente registrado</td></tr>`;
+  </tr>`).join(''):`<tr><td colspan="${ed?5:4}" class="empty-state">Nenhum incidente registrado</td></tr>`;
 }
 function vAbrirModalInc(){
   if(!vCanReg('sst')) return;
+  if(!vCompetenciaAberta()){ toast('Nenhuma competência aberta pelo RH','error'); return; }
   $('v-inc-setor').innerHTML=vSetorOpts();
-  $('v-inc-data').value=new Date().toISOString().split('T')[0];
   $('v-inc-desc').value='';
   $('v-modal-inc').classList.add('show');
 }
 function vSalvarInc(){
   if(!vCanReg('sst')) return;
-  const setor=$('v-inc-setor').value, data=$('v-inc-data').value;
+  if(!vCompetenciaAberta()){ toast('Nenhuma competência aberta pelo RH','error'); return; }
+  const setor=$('v-inc-setor').value;
   const tipo=$('v-inc-tipo').value, desc=$('v-inc-desc').value.trim();
-  if(!data){ toast('Informe a data','error'); return; }
-  varDB.sst_incidentes.push({ id:Date.now().toString(), setor, data, tipo, desc, periodo:vPkey() });
+  varDB.sst_incidentes.push({ id:Date.now().toString(), setor, tipo, desc, periodo:vPkey(), ts:Date.now() });
   varSave(); vFecharModal('v-modal-inc'); vSstRender(); toast('Incidente registrado');
 }
 function vRemoverInc(id){
@@ -1750,9 +1761,6 @@ function vRenderPainel(){
           <option value="" ${vPainelMod===''?'selected':''}>Todos os módulos</option>
           <option value="adm" ${vPainelMod==='adm'?'selected':''}>Administrativo</option>
           <option value="industria" ${vPainelMod==='industria'?'selected':''}>Operação</option>
-          <option value="trimestral" ${vPainelMod==='trimestral'?'selected':''}>Trimestral</option>
-          <option value="semestral" ${vPainelMod==='semestral'?'selected':''}>Semestral</option>
-          <option value="anual" ${vPainelMod==='anual'?'selected':''}>Anual</option>
         </select>
         <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="vImprimirPainel()">🖨 PDF</button>
       </div>
@@ -1768,7 +1776,7 @@ function vRenderPainel(){
 
   // montar combos
   const combos=[];
-  const modulos = vPainelMod?[vPainelMod]:['adm','industria','trimestral','semestral','anual'];
+  const modulos = vPainelMod?[vPainelMod]:['adm','industria'];
   modulos.forEach(mod=>{
     vSetoresModulo(mod).filter(vSetorPermitido).forEach(setor=>{
       const inds=varDB.indicadores.filter(i=>i.setor===setor && i.periodicidade===((mod==='adm'||mod==='industria')?'mensal':mod) && (mod==='adm'?i.modulo==='adm':mod==='industria'?i.modulo==='industria':true));
@@ -1839,7 +1847,7 @@ function vRenderPainel(){
 
   const media=count>0?totalFinal/count:null;
   const fatObj=varDB.faturamento[pkey];
-  const fatTxt=(!fatObj||typeof fatObj!=='object')?'—':[['mensal','ADM/OP'],['trimestral','Tri'],['semestral','Sem'],['anual','Anu']].map(([t,n])=>fatObj[t]>0?n+': '+fatObj[t].toFixed(1)+'%':null).filter(Boolean).join(' | ')||'—';
+  const fatTxt=(!fatObj||typeof fatObj!=='object')?'—':[['mensal','ADM/OP'],['trimestral','Tri'],['semestral','Sem'],['anual','Anu']].map(([t,n])=>(fatObj[t]!==undefined&&fatObj[t]!==null)?n+': '+fatObj[t].toFixed(1)+'%':null).filter(Boolean).join(' | ')||'—';
   $('v-painel-kpis').innerHTML=`
     <div class="stat-card"><div class="stat-label">Média geral</div><div class="stat-value" style="color:${media===null?'var(--text3)':media>=0.85?'var(--green)':media>0?'var(--amber)':'var(--red)'}">${media!==null?(media*100).toFixed(1)+'%':'—'}</div><div class="stat-sub">todos os setores</div></div>
     <div class="stat-card"><div class="stat-label">Acima de 85%</div><div class="stat-value" style="color:var(--green)">${acima}</div><div class="stat-sub">de ${combos.length} combos</div></div>
@@ -3139,12 +3147,13 @@ function vPeriodoSelect(reRender){
 /* ---------- aba 5S ---------- */
 function renderVar5s(){
   const ed=vCanReg('5s');
+  const comp=vAplicarCompetenciaAberta();
   $('var-content').innerHTML=`
-    ${vPeriodoSelect('renderVar5s')}
+    ${vCompLockCardHtml(comp)}
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
         <div><h3>5S — Situação do período</h3><div class="card-sub">Média &lt; 7,5 gera penalidade de −5%.</div></div>
-        ${ed?`<button class="btn btn-primary btn-sm" onclick="vAbrirModalAud()">+ Nova auditoria</button>`:''}
+        ${ed&&comp?`<button class="btn btn-primary btn-sm" onclick="vAbrirModalAud()">+ Nova auditoria</button>`:''}
       </div>
       <div class="tbl-wrap" style="margin-top:8px"><table>
         <thead><tr><th>Setor</th><th>Auditorias</th><th>Média</th><th>Penalidade</th><th>Status</th></tr></thead>
@@ -3153,16 +3162,13 @@ function renderVar5s(){
     <div class="card">
       <h3>5S — Histórico de auditorias</h3>
       <div class="tbl-wrap" style="margin-top:8px"><table>
-        <thead><tr><th>Setor</th><th>Nota</th><th>Data</th><th>Auditor</th><th>Período</th>${ed?'<th></th>':''}</tr></thead>
+        <thead><tr><th>Setor</th><th>Nota</th><th>Auditor</th><th>Período</th>${ed?'<th></th>':''}</tr></thead>
         <tbody id="v-5s-hist-tbody"></tbody></table></div>
     </div>
     <div class="modal-bg" id="v-modal-aud"><div class="modal">
       <h3>Nova auditoria 5S</h3>
       <div class="field"><label>Setor</label><select id="v-aud-setor"></select></div>
-      <div class="row">
-        <div class="field"><label>Nota (0 a 10)</label><input type="number" id="v-aud-nota" step="0.1" min="0" max="10"></div>
-        <div class="field"><label>Data</label><input type="date" id="v-aud-data"></div>
-      </div>
+      <div class="field"><label>Nota (0 a 10)</label><input type="number" id="v-aud-nota" step="0.1" min="0" max="10"></div>
       <div class="field"><label>Auditor (opcional)</label><input type="text" id="v-aud-auditor"></div>
       <div class="modal-actions"><button class="btn btn-ghost" onclick="vFecharModal('v-modal-aud')">Cancelar</button><button class="btn btn-primary" onclick="vSalvarAud()">Salvar</button></div>
     </div></div>`;
@@ -3172,8 +3178,9 @@ function renderVar5s(){
 /* ---------- aba SST ---------- */
 function renderVarSst(){
   const ed=vCanReg('sst'); const adm=!!currentUser.admin;
+  const comp=vAplicarCompetenciaAberta();
   $('var-content').innerHTML=`
-    ${vPeriodoSelect('renderVarSst')}
+    ${vCompLockCardHtml(comp)}
     <div class="card" style="${varDB.acidente_fatal?'border-color:#f5c6c2;background:#fffafa':''}">
       <h3>SST — Segurança</h3>
       <div class="card-sub">Incidente por setor: −5% no período. Acidente fatal: zera toda a variável (−100%).</div>
@@ -3181,18 +3188,15 @@ function renderVarSst(){
         <input type="checkbox" id="v-fatal-chk" ${varDB.acidente_fatal?'checked':''} onchange="vToggleFatal(this.checked)">
         <span style="font-weight:600;color:${varDB.acidente_fatal?'var(--red)':'var(--text1)'}">Registrar acidente fatal no período (${vPeriodLabel()})</span>
       </label>`:`<div style="margin-bottom:14px;font-size:13px;color:${varDB.acidente_fatal?'var(--red)':'var(--text2)'}">Acidente fatal: <b>${varDB.acidente_fatal?'SIM — variável zerada':'Não'}</b></div>`}
-      ${ed?`<button class="btn btn-primary btn-sm" onclick="vAbrirModalInc()">+ Registrar incidente</button>`:''}
+      ${ed&&comp?`<button class="btn btn-primary btn-sm" onclick="vAbrirModalInc()">+ Registrar incidente</button>`:''}
       <div class="tbl-wrap" style="margin-top:14px"><table>
-        <thead><tr><th>Setor</th><th>Data</th><th>Tipo</th><th>Descrição</th><th>Período</th>${ed?'<th></th>':''}</tr></thead>
+        <thead><tr><th>Setor</th><th>Tipo</th><th>Descrição</th><th>Período</th>${ed?'<th></th>':''}</tr></thead>
         <tbody id="v-sst-tbody"></tbody></table></div>
     </div>
     <div class="modal-bg" id="v-modal-inc"><div class="modal">
       <h3>Registrar incidente SST</h3>
       <div class="field"><label>Setor</label><select id="v-inc-setor"></select></div>
-      <div class="row">
-        <div class="field"><label>Data</label><input type="date" id="v-inc-data"></div>
-        <div class="field"><label>Tipo</label><select id="v-inc-tipo"><option>Acidente por Ato Inseguro</option></select></div>
-      </div>
+      <div class="field"><label>Tipo</label><select id="v-inc-tipo"><option>Acidente por Ato Inseguro</option></select></div>
       <div class="field"><label>Descrição (opcional)</label><input type="text" id="v-inc-desc"></div>
       <div class="modal-actions"><button class="btn btn-ghost" onclick="vFecharModal('v-modal-inc')">Cancelar</button><button class="btn btn-primary" onclick="vSalvarInc()">Salvar</button></div>
     </div></div>`;
@@ -3296,7 +3300,7 @@ async function folhaExportarConferencia(){
 
 function vAtingimentoMedio(){
   const combos=[];
-  ['adm','industria','trimestral','semestral','anual'].forEach(mod=>{
+  ['adm','industria'].forEach(mod=>{
     vSetoresModulo(mod).forEach(setor=>{
       const inds=varDB.indicadores.filter(i=>i.setor===setor
         && i.periodicidade===((mod==='adm'||mod==='industria')?'mensal':mod)
@@ -3514,6 +3518,586 @@ function eColetarSetores(){
   const ex=document.getElementById('e-setores-extra');
   const extra=(ex?ex.value:'').split(/[,;]/).map(s=>s.trim()).filter(Boolean);
   return [...new Set([...checked,...extra])];
+}
+
+</script>
+<script>
+/* ===================================================================
+   MÓDULO PRÊMIO PERIÓDICO — Trimestral / Semestral / Anual
+   Store próprio (periodico/principal). Mesmo motor de metas (vCalcAting,
+   vFmt, vEsc, vPeriodTag, vSetorPermitido, vMESES, vNomeMes, vStatusBadge)
+   reaproveitado do módulo Variável. Faturamento é lançado mês a mês
+   dentro do ciclo e entra como MÉDIA dos meses (igual aos indicadores).
+   RH libera o ciclo para os gestores lançarem; Painel sempre navegável.
+   =================================================================== */
+
+const QER_REF = db.collection('periodico').doc('principal');
+let qDB = null;
+let qSaveTimer = null;
+let qTab = 'cadastros';
+let qMod = 'trimestral';   // trimestral | semestral | anual
+let qSetor = null;
+let qTurno = '';
+let qFuncao = '';
+let qPainelMod = '';
+
+function qHora(){ return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+function qCanEdit(){ return !!currentUser.admin; }
+function qModNome(m){ return {trimestral:'Trimestral',semestral:'Semestral',anual:'Anual'}[m]||m; }
+function qFatMult(mod){ return {trimestral:2,semestral:2.5,anual:3}[mod||qMod]||1; }
+
+/* ---------- defaults ---------- */
+function qDefaults(){
+  const d=new Date();
+  return {
+    periodo:{ mes:d.getMonth()+1, ano:d.getFullYear() },
+    setores:[],
+    indicadores:[],
+    resultados:{},     // resultados[mesPkey][rKey][indId] = valor
+    faturamento:{},    // faturamento[mesPkey][periodicidade] = valor (0-10)
+    liberados:{}        // liberados['periodicidade||cicloKey'] = true
+  };
+}
+function qEnsure(d){
+  d=d||{}; const def=qDefaults();
+  if(!d.periodo||!d.periodo.mes) d.periodo=def.periodo;
+  if(!d.setores) d.setores=[];
+  if(!d.indicadores) d.indicadores=[];
+  if(!d.resultados) d.resultados={};
+  if(!d.faturamento) d.faturamento={};
+  if(!d.liberados) d.liberados={};
+  return d;
+}
+function qSerialize(){ return { data: JSON.stringify(qDB), updated: Date.now() }; }
+function qParse(raw){ if(raw && typeof raw.data==='string'){ try{ return JSON.parse(raw.data); }catch(e){ return {}; } } return raw||{}; }
+function qSave(){
+  clearTimeout(qSaveTimer);
+  qSaveTimer=setTimeout(()=>{
+    QER_REF.set(qSerialize()).then(()=>setSync(true,'Salvo '+qHora())).catch(()=>setSync(false,'Erro ao salvar'));
+  },400);
+}
+
+/* ---------- ciclo (meses que compõem o período) ---------- */
+function qMesesCiclo(periodicidade, refMes, refAno){
+  const qtd = periodicidade==='trimestral'?3 : periodicidade==='semestral'?6 : 12;
+  let fechamento = periodicidade==='anual' ? 12 : Math.ceil(refMes/qtd)*qtd;
+  const meses=[];
+  for(let i=qtd-1;i>=0;i--){ let m=fechamento-i, a=refAno; if(m<=0){ m+=12; a-=1; } meses.push({mes:m,ano:a,pkey:`${a}-${String(m).padStart(2,'0')}`}); }
+  return meses;
+}
+function qMeses(){ return qMesesCiclo(qMod, qDB.periodo.mes, qDB.periodo.ano); }
+function qCicloKey(){ const meses=qMeses(); return meses[meses.length-1].pkey; }
+function qCicloLabel(){ const meses=qMeses(); const ini=meses[0], fim=meses[meses.length-1]; return `${vNomeMes(ini.mes)}/${ini.ano} – ${vNomeMes(fim.mes)}/${fim.ano}`; }
+function qCicloLabelPara(mod){ const meses=qMesesCiclo(mod,qDB.periodo.mes,qDB.periodo.ano); const ini=meses[0],fim=meses[meses.length-1]; return `${vNomeMes(ini.mes)}–${vNomeMes(fim.mes)}/${fim.ano}`; }
+function qLibKey(mod){ const m=mod||qMod; const meses=qMesesCiclo(m,qDB.periodo.mes,qDB.periodo.ano); return `${m}||${meses[meses.length-1].pkey}`; }
+
+/* ---------- liberação (RH abre/fecha o ciclo para os gestores) ---------- */
+function qLiberado(){ return !!(qDB.liberados && qDB.liberados[qLibKey()]); }
+function qPodeLancar(){ return !!currentUser.admin || qLiberado(); }
+function qToggleLiberado(on){
+  if(!qCanEdit()) return;
+  const msg = on ? `Liberar o lançamento de ${qCicloLabel()} (${qModNome(qMod)}) para os gestores?` : `Bloquear o lançamento de ${qCicloLabel()}? Os gestores não poderão mais lançar até liberar de novo.`;
+  if(!confirm(msg)) return;
+  if(!qDB.liberados) qDB.liberados={};
+  if(on) qDB.liberados[qLibKey()]=true; else delete qDB.liberados[qLibKey()];
+  qSave(); renderQLancamento();
+  toast(on?'Lançamento liberado':'Lançamento bloqueado');
+}
+
+/* ---------- shell / roteador de sub-abas ---------- */
+function renderPeriodico(){
+  $('content').innerHTML=`
+    <div class="page-title">Prêmio Periódico</div>
+    <div class="page-sub">Metas trimestrais, semestrais e anuais por setor.</div>
+    <div class="subnav" id="q-subnav"></div>
+    <div id="q-content"><div class="empty-state">Carregando…</div></div>
+
+    <div class="modal-bg" id="q-modal-ind">
+      <div class="modal modal-lg">
+        <h3 id="qi-title">Novo indicador</h3>
+        <input type="hidden" id="qi-id">
+        <div class="field"><label>Nome do indicador</label><input type="text" id="qi-nome" placeholder="Ex.: CRESCIMENTO DE VENDAS (%)"></div>
+        <div class="row">
+          <div class="field"><label>Periodicidade</label><select id="qi-period"><option value="trimestral">Trimestral</option><option value="semestral">Semestral</option><option value="anual">Anual</option></select></div>
+          <div class="field"><label>Setor</label><select id="qi-setor"></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Turno (opcional)</label><input type="text" id="qi-turno" placeholder="deixe vazio p/ todos"></div>
+          <div class="field"><label>Cargo / função (opcional)</label><input type="text" id="qi-funcao" placeholder="deixe vazio p/ todos"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Sentido</label><select id="qi-sentido"><option value="maior">Maior é melhor ↑</option><option value="menor">Menor é melhor ↓</option></select></div>
+          <div class="field"><label>Formato</label><select id="qi-formato"><option value="inteiro">Inteiro</option><option value="absoluto">Absoluto (decimais)</option><option value="decimal">Decimal (%)</option></select></div>
+        </div>
+        <div class="field"><label>Peso (0 a 1 — ex.: 0,40 = 40%)</label><input type="number" id="qi-peso" step="0.01" min="0" max="1" placeholder="0.40"></div>
+        <div class="row">
+          <div class="field"><label>Meta 85%</label><input type="number" id="qi-m85" step="any"></div>
+          <div class="field"><label>Meta 90%</label><input type="number" id="qi-m90" step="any"></div>
+          <div class="field"><label>Meta 95%</label><input type="number" id="qi-m95" step="any"></div>
+          <div class="field"><label>Meta 100%</label><input type="number" id="qi-m100" step="any"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="qFecharModalInd()">Cancelar</button>
+          <button class="btn btn-primary" onclick="qSalvarInd()">Salvar indicador</button>
+        </div>
+      </div>
+    </div>`;
+
+  qBuildSubnav();
+  if(qUnsub){ qUnsub(); qUnsub=null; }
+  qUnsub = QER_REF.onSnapshot(doc=>{
+    if(doc.metadata.hasPendingWrites) return;
+    if(doc.exists){ qDB = qEnsure(qParse(doc.data())); }
+    else { qDB = qDefaults(); QER_REF.set(qSerialize()); }
+    setSync(true,'Online · '+qHora());
+    renderQTab();
+  }, ()=>setSync(false,'Erro ao carregar'));
+}
+const Q_PAGES=[
+  { id:'cadastros', nome:'Cadastros' },
+  { id:'lancamento', nome:'Lançamento' },
+  { id:'painel', nome:'Painel' }
+];
+function qAvailPages(){ return currentUser.admin ? Q_PAGES : Q_PAGES.filter(p=>p.id!=='cadastros'); }
+function qBuildSubnav(){
+  const pages=qAvailPages();
+  if(!pages.some(p=>p.id===qTab)) qTab=pages.length?pages[0].id:'lancamento';
+  $('q-subnav').innerHTML = pages.map(p=>`<button class="subtab ${qTab===p.id?'active':''}" id="qt-${p.id}" onclick="setQTab('${p.id}')">${p.nome}</button>`).join('');
+}
+function setQTab(t){ qTab=t; renderQTab(); }
+function renderQTab(){
+  document.querySelectorAll('.subtab').forEach(b=>b.classList.remove('active'));
+  const b=$('qt-'+qTab); if(b) b.classList.add('active');
+  const c=$('q-content'); if(!c) return;
+  if(!qDB){ c.innerHTML='<div class="empty-state">Carregando…</div>'; return; }
+  if(qTab==='cadastros') return renderQCadastros();
+  if(qTab==='lancamento') return renderQLancamento();
+  if(qTab==='painel'){ $('q-content').innerHTML='<div id="q-painel-inner"></div>'; return renderQPainel(); }
+}
+
+/* ---------- CADASTROS (só admin) ---------- */
+function renderQCadastros(){
+  if(!currentUser.admin){ $('q-content').innerHTML='<div class="empty-state">Cadastros é restrito ao administrador.</div>'; return; }
+  $('q-content').innerHTML = `
+    <div class="card">
+      <h3>Setores</h3>
+      <div class="card-sub">Setores avaliados nos ciclos trimestral, semestral e anual.</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Setor</th><th></th></tr></thead><tbody id="q-setores-tbody"></tbody></table></div>
+      <div class="add-row"><input id="q-ns" placeholder="Novo setor" onkeydown="if(event.key==='Enter')qAddSetor()"><button class="btn btn-primary" onclick="qAddSetor()">Adicionar</button></div>
+    </div>
+    <div class="card">
+      <h3>Indicadores</h3>
+      <div class="card-sub">Metas, pesos e sentido de cada indicador por setor e periodicidade.</div>
+      <div class="filters">
+        <select id="q-f-mod" onchange="renderQIndicadores()">
+          <option value="">Todas as periodicidades</option>
+          <option value="trimestral">Trimestral</option><option value="semestral">Semestral</option><option value="anual">Anual</option>
+        </select>
+        <select id="q-f-setor" onchange="renderQIndicadores()"><option value="">Todos os setores</option></select>
+        <button class="btn btn-primary" style="margin-left:auto" onclick="qAbrirModalInd()">+ Novo indicador</button>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Setor</th><th>Period.</th><th>Indicador</th><th>Sent.</th><th>Fmt</th><th>Peso</th><th>85%</th><th>90%</th><th>95%</th><th>100%</th><th></th></tr></thead>
+        <tbody id="q-ind-tbody"></tbody>
+      </table></div>
+    </div>`;
+  qRenderSetores(); renderQIndicadores();
+}
+function qRenderSetores(){
+  const tb=$('q-setores-tbody'); if(!tb) return;
+  tb.innerHTML = qDB.setores.map(s=>`<tr><td style="font-size:13px">${s}</td><td><button class="btn btn-danger btn-sm" onclick="qRemoverSetor('${vEsc(s)}')">Remover</button></td></tr>`).join('') || `<tr><td colspan="2" class="empty-state">Nenhum setor</td></tr>`;
+}
+function qAddSetor(){
+  const el=$('q-ns'); const nome=el.value.trim().toUpperCase(); if(!nome) return;
+  if(qDB.setores.includes(nome)){ toast('Setor já existe','error'); return; }
+  qDB.setores.push(nome); el.value=''; qRenderSetores(); qSave(); toast('Setor adicionado');
+}
+function qRemoverSetor(nome){
+  if(!confirm('Remover '+nome+'? Indicadores desse setor continuam existindo, mas não aparecerão nos filtros até você recriar o setor.')) return;
+  qDB.setores=qDB.setores.filter(s=>s!==nome); qRenderSetores(); qSave(); toast('Setor removido');
+}
+function renderQIndicadores(){
+  const fMod=$('q-f-mod')?.value||'', fSet=$('q-f-setor')?.value||'';
+  let inds=qDB.indicadores;
+  if(fMod) inds=inds.filter(i=>i.periodicidade===fMod);
+  if(fSet) inds=inds.filter(i=>i.setor===fSet);
+  const sel=$('q-f-setor');
+  if(sel){ const cur=sel.value;
+    sel.innerHTML='<option value="">Todos os setores</option>'+qDB.setores.map(s=>`<option${s===cur?' selected':''}>${s}</option>`).join(''); }
+  const tb=$('q-ind-tbody'); if(!tb) return;
+  tb.innerHTML = inds.length ? inds.map(ind=>`
+    <tr>
+      <td style="font-size:12px">${ind.setor}</td>
+      <td>${vPeriodTag(ind.periodicidade)}</td>
+      <td style="font-weight:500;max-width:220px">${ind.nome}${ind.turno?`<div style="font-size:10px;color:var(--text3)">${ind.turno}</div>`:''}${ind.funcao?`<div style="font-size:10px;color:var(--text3)">Cargo: ${ind.funcao}</div>`:''}</td>
+      <td><span class="badge ${ind.sentido==='maior'?'badge-green':'badge-amber'}">${ind.sentido==='maior'?'↑':'↓'}</span></td>
+      <td><span class="badge badge-gray" style="font-size:10px">${ind.formato||'dec'}</span></td>
+      <td class="mono">${(ind.peso*100).toFixed(0)}%</td>
+      <td class="mono" style="color:var(--text3)">${vFmt(ind.m85,ind.formato)}</td>
+      <td class="mono" style="color:var(--text3)">${vFmt(ind.m90,ind.formato)}</td>
+      <td class="mono" style="color:var(--text3)">${vFmt(ind.m95,ind.formato)}</td>
+      <td class="mono" style="font-weight:700">${vFmt(ind.m100,ind.formato)}</td>
+      <td style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="qAbrirModalInd(${ind.id})">Editar</button><button class="btn btn-danger btn-sm" onclick="qRemoverInd(${ind.id})">Remover</button></td>
+    </tr>`).join('') : `<tr><td colspan="11" class="empty-state">Nenhum indicador encontrado</td></tr>`;
+}
+function qUpdateSetorSel(cur){
+  const sel=$('qi-setor'); if(!sel) return;
+  sel.innerHTML = qDB.setores.map(s=>`<option${s===cur?' selected':''}>${s}</option>`).join('') || '<option value="">— cadastre um setor —</option>';
+}
+function qAbrirModalInd(id){
+  const ind = id ? qDB.indicadores.find(i=>i.id===id) : null;
+  $('qi-title').textContent = ind ? 'Editar indicador' : 'Novo indicador';
+  $('qi-id').value = ind ? ind.id : '';
+  $('qi-nome').value = ind ? ind.nome : '';
+  $('qi-period').value = ind ? ind.periodicidade : qMod;
+  qUpdateSetorSel(ind ? ind.setor : (qDB.setores[0]||''));
+  $('qi-turno').value = ind ? (ind.turno||'') : '';
+  $('qi-funcao').value = ind ? (ind.funcao||'') : '';
+  $('qi-sentido').value = ind ? ind.sentido : 'maior';
+  $('qi-formato').value = ind ? (ind.formato||'inteiro') : 'inteiro';
+  $('qi-peso').value = ind ? ind.peso : '';
+  $('qi-m85').value = (ind && ind.m85!==null && ind.m85!==undefined) ? ind.m85 : '';
+  $('qi-m90').value = (ind && ind.m90!==null && ind.m90!==undefined) ? ind.m90 : '';
+  $('qi-m95').value = (ind && ind.m95!==null && ind.m95!==undefined) ? ind.m95 : '';
+  $('qi-m100').value = (ind && ind.m100!==null && ind.m100!==undefined) ? ind.m100 : '';
+  $('q-modal-ind').classList.add('show');
+}
+function qFecharModalInd(){ $('q-modal-ind').classList.remove('show'); }
+function qSalvarInd(){
+  if(!qCanEdit()) return;
+  const nome=$('qi-nome').value.trim().toUpperCase();
+  if(!nome){ toast('Informe o nome','error'); return; }
+  const setor=$('qi-setor').value;
+  if(!setor){ toast('Cadastre um setor primeiro','error'); return; }
+  const peso=parseFloat($('qi-peso').value);
+  if(isNaN(peso)||peso<=0||peso>1){ toast('Peso deve ser entre 0 e 1','error'); return; }
+  const parseNum=v=>{ v=String(v).trim(); if(v==='') return null; const n=parseFloat(v.replace(',','.')); return isNaN(n)?null:n; };
+  const dados={
+    nome, setor,
+    periodicidade: $('qi-period').value,
+    turno: $('qi-turno').value.trim(),
+    funcao: $('qi-funcao').value.trim(),
+    sentido: $('qi-sentido').value,
+    formato: $('qi-formato').value,
+    peso,
+    m85: parseNum($('qi-m85').value), m90: parseNum($('qi-m90').value),
+    m95: parseNum($('qi-m95').value), m100: parseNum($('qi-m100').value)
+  };
+  const editId=$('qi-id').value;
+  if(editId){
+    const idx=qDB.indicadores.findIndex(i=>i.id==editId);
+    if(idx>=0) qDB.indicadores[idx]={ ...qDB.indicadores[idx], ...dados };
+  } else {
+    const maxId=qDB.indicadores.reduce((m,i)=>Math.max(m,i.id),0);
+    qDB.indicadores.push({ id:maxId+1, ...dados });
+  }
+  qSave(); qFecharModalInd(); renderQIndicadores();
+  toast(editId?'Indicador atualizado':'Indicador adicionado');
+}
+function qRemoverInd(id){
+  if(!qCanEdit()) return;
+  if(!confirm('Remover este indicador?')) return;
+  qDB.indicadores=qDB.indicadores.filter(i=>i.id!==id);
+  qSave(); renderQIndicadores(); toast('Indicador removido');
+}
+
+/* ---------- LANÇAMENTO ---------- */
+function renderQLancamento(){
+  const anoAtual = new Date().getFullYear();
+  const anos=[]; for(let a=anoAtual-2;a<=anoAtual+1;a++) anos.push(a);
+  const c=$('q-content');
+  c.innerHTML=`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+        <div class="periodo-sel">
+          <span style="font-size:12px;font-weight:600;color:var(--text2)">Referência:</span>
+          <select id="q-per-mes" onchange="qSetPeriodo()">${vMESES.map((m,i)=>`<option value="${i+1}" ${qDB.periodo.mes===i+1?'selected':''}>${m}</option>`).join('')}</select>
+          <select id="q-per-ano" onchange="qSetPeriodo()">${anos.map(a=>`<option ${qDB.periodo.ano===a?'selected':''}>${a}</option>`).join('')}</select>
+        </div>
+        <span class="badge badge-green" style="font-size:12px">${qCicloLabel()}</span>
+      </div>
+      <div class="modbar" style="margin-top:16px">
+        ${[['trimestral','Trimestral'],['semestral','Semestral'],['anual','Anual']]
+          .map(([k,n])=>`<button class="modchip ${qMod===k?'active':''}" onclick="qSelectMod('${k}')">${n}</button>`).join('')}
+      </div>
+    </div>
+
+    ${!currentUser.admin && !qLiberado() ? `<div class="fatal-banner" style="background:#fff8ec;border-color:#f5d9a8;color:var(--amber)">⏳ O RH ainda não liberou o lançamento de ${qCicloLabel()} (${qModNome(qMod)}). Você pode consultar o histórico no Painel.</div>` : ''}
+
+    ${currentUser.admin?`<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+      <div>
+        <h3 style="margin:0">Lançamento — ${qCicloLabel()} (${qModNome(qMod)})</h3>
+        <div class="card-sub" style="margin-bottom:0">${qLiberado()?'Liberado para os gestores lançarem.':'Bloqueado — apenas administradores podem lançar.'}</div>
+      </div>
+      ${qLiberado()?`<button class="btn btn-danger" onclick="qToggleLiberado(false)">🔒 Bloquear lançamento</button>`
+        : `<button class="btn btn-primary" onclick="qToggleLiberado(true)">🟢 Liberar lançamento p/ gestores</button>`}
+    </div>`:''}
+
+    ${currentUser.admin?`<div class="card" id="q-fat-card">
+      <h3>Faturamento</h3>
+      <div class="card-sub">Somente administradores. Informe o % de cada mês do ciclo (0 a 10%) — o resultado usa a média dos meses.</div>
+      <div id="q-fat-tabela"></div>
+    </div>`:''}
+
+    <div class="card">
+      <h3>Selecione o setor</h3>
+      <div id="q-setor-chips" style="margin:12px 0 4px"></div>
+    </div>
+
+    <div class="card" id="q-lanc-card" style="display:none">
+      <h3 id="q-lanc-title">Indicadores</h3>
+      <div id="q-lanc-tabs"></div>
+      <div id="q-lanc-content"></div>
+    </div>`;
+  if(currentUser.admin) qRenderFatTabela();
+  qRenderSetorChips();
+  if(qSetor) renderQLancTable();
+}
+function qSetPeriodo(){
+  qDB.periodo.mes=parseInt($('q-per-mes').value,10);
+  qDB.periodo.ano=parseInt($('q-per-ano').value,10);
+  qSetor=null; qTurno=''; qFuncao='';
+  qSave(); renderQLancamento();
+}
+function qSelectMod(mod){
+  qMod=mod; qSetor=null; qTurno=''; qFuncao='';
+  renderQLancamento();
+}
+
+/* ---------- faturamento mensal do ciclo ---------- */
+function qFatMedia(mod){
+  const m=mod||qMod;
+  const meses=qMesesCiclo(m,qDB.periodo.mes,qDB.periodo.ano);
+  const vals=meses.map(mm=>{ const f=qDB.faturamento[mm.pkey]; return (f&&f[m]!==undefined&&f[m]!==null)?f[m]:null; });
+  if(vals.every(v=>v===null)) return null;
+  return vals.reduce((s,v)=>s+(v!==null?v:0),0)/meses.length;
+}
+function qGetFat(mod){ const media=qFatMedia(mod); return media===null?0:(media/100)*qFatMult(mod); }
+function qRenderFatTabela(){
+  const cont=$('q-fat-tabela'); if(!cont) return;
+  const meses=qMeses();
+  const fat=qDB.faturamento;
+  const cols=meses.map(m=>{
+    const v=(fat[m.pkey]&&fat[m.pkey][qMod]!==undefined&&fat[m.pkey][qMod]!==null)?fat[m.pkey][qMod]:'';
+    return `<div class="field" style="max-width:110px">
+      <label>${vNomeMes(m.mes)}/${String(m.ano).slice(2)}</label>
+      <input type="number" step="0.1" min="0" max="10" value="${v}" placeholder="0,0" onchange="qSalvarFatMes('${m.pkey}',this.value)">
+    </div>`;
+  }).join('');
+  const media=qFatMedia();
+  cont.innerHTML = `<div class="row">${cols}</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:4px">Média do ciclo: <strong>${media!==null?media.toFixed(1)+'%':'—'}</strong> · contribuição no resultado: <strong style="color:var(--accent)">${media!==null?'+'+(qGetFat()*100).toFixed(1)+'%':'—'}</strong> (multiplicador ×${String(qFatMult()).replace('.',',')})</div>`;
+}
+function qSalvarFatMes(pkey,valor){
+  if(!qCanEdit()){ toast('Apenas administradores','error'); return; }
+  const v=String(valor).replace(',','.').trim();
+  if(!qDB.faturamento[pkey]) qDB.faturamento[pkey]={};
+  if(v===''){ delete qDB.faturamento[pkey][qMod]; }
+  else{
+    const n=parseFloat(v);
+    if(isNaN(n)||n<0||n>10){ toast('Informe um valor entre 0 e 10 (pode ser 0)','error'); qRenderFatTabela(); return; }
+    qDB.faturamento[pkey][qMod]=n;
+  }
+  qSave(); qRenderFatTabela(); renderQLancTable();
+}
+
+/* ---------- setores / tabela de indicadores (colunas por mês) ---------- */
+function qSetoresComInd(){
+  const usados=[...new Set(qDB.indicadores.filter(i=>i.periodicidade===qMod).map(i=>i.setor))];
+  return qDB.setores.filter(s=>usados.includes(s));
+}
+function qRenderSetorChips(){
+  const cont=$('q-setor-chips'); if(!cont) return;
+  const setores=qSetoresComInd().filter(vSetorPermitido);
+  if(!setores.length){
+    qSetor=null; cont.innerHTML='<span style="font-size:13px;color:var(--text3)">Nenhum indicador cadastrado para esta periodicidade.</span>';
+    const lc=$('q-lanc-card'); if(lc) lc.style.display='none'; return;
+  }
+  if(qSetor && !setores.includes(qSetor)) qSetor=null;
+  cont.innerHTML=setores.map(s=>`<span class="setor-chip ${qSetor===s?'active':''}" onclick="qSelectSetor('${vEsc(s)}')">${s}</span>`).join('');
+  const lc=$('q-lanc-card'); if(lc) lc.style.display = qSetor?'block':'none';
+}
+function qSelectSetor(s){ qSetor=s; qTurno=''; qFuncao=''; qRenderSetorChips(); renderQLancTable(); }
+function qLancInds(){ return qDB.indicadores.filter(i=>i.setor===qSetor && i.periodicidade===qMod); }
+function qLancBase(inds){
+  const turnos=[...new Set(inds.filter(i=>i.turno).map(i=>i.turno))];
+  const hasTurnos=turnos.length>0;
+  const indsSemTurno=inds.filter(i=>!i.turno);
+  if(hasTurnos){
+    const indsDoTurno=inds.filter(i=>i.turno===qTurno);
+    const b=[...indsDoTurno,...indsSemTurno];
+    return qFuncao? b.filter(i=>i.funcao===qFuncao||!i.funcao) : b;
+  }
+  return qFuncao? inds.filter(i=>i.funcao===qFuncao) : inds;
+}
+function qRKey(){ return `${qSetor}||${qTurno||''}${qFuncao?'||'+qFuncao:''}`; }
+function renderQLancTable(){
+  if(!qSetor) return;
+  $('q-lanc-title').textContent=`Indicadores — ${qSetor}`;
+  const inds=qLancInds();
+  const turnos=[...new Set(inds.filter(i=>i.turno).map(i=>i.turno))];
+  const hasTurnos=turnos.length>0;
+  if(hasTurnos && !qTurno) qTurno=turnos[0];
+  const indsSemTurno=inds.filter(i=>!i.turno);
+
+  let tabs='';
+  if(hasTurnos){
+    tabs+='<div class="tabs-inline">'+turnos.map(t=>`<div class="tab-inline ${t===qTurno?'active':''}" onclick="qTurno='${vEsc(t)}';qFuncao='';renderQLancTable()">${t}</div>`).join('')+'</div>';
+  }
+  const indsDoTurno=hasTurnos?inds.filter(i=>i.turno===qTurno):[];
+  const indsParaFuncao=hasTurnos?[...indsDoTurno,...indsSemTurno]:inds;
+  const funcoes=[...new Set(indsParaFuncao.filter(i=>i.funcao).map(i=>i.funcao))];
+  if(funcoes.length){
+    tabs+='<div class="tabs-inline">'+
+      `<div class="tab-inline ${!qFuncao?'active':''}" onclick="qFuncao='';renderQLancTable()">Todos</div>`+
+      funcoes.map(f=>`<div class="tab-inline ${f===qFuncao?'active':''}" onclick="qFuncao='${vEsc(f)}';renderQLancTable()">${f}</div>`).join('')+'</div>';
+  }
+
+  const base=qLancBase(inds);
+  const rKey=qRKey();
+  const meses=qMeses();
+  const bloqueado=!qPodeLancar();
+  const mesHead=meses.map(m=>`<th>${vNomeMes(m.mes)}/${String(m.ano).slice(2)}</th>`).join('');
+  let html=`<div class="tbl-wrap"><table class="lanc-table">
+    <thead><tr><th>Indicador</th><th>Sent.</th><th>Peso</th><th>85%</th><th>90%</th><th>95%</th><th>100%</th>${mesHead}<th>Média</th><th>Ating.</th></tr></thead><tbody>`;
+  let totalPeso=0,totalAting=0;
+  base.forEach(ind=>{
+    totalPeso+=ind.peso;
+    const resPorMes=meses.map(m=>{ const s=((qDB.resultados[m.pkey]||{})[rKey]||{}); return s[ind.id]!==undefined?s[ind.id]:null; });
+    const comValor=resPorMes.filter(v=>v!==null);
+    const media=comValor.length? resPorMes.reduce((s,v)=>s+(v!==null?v:0),0)/meses.length : null;
+    const ating=comValor.length? vCalcAting(ind,media):null;
+    if(ating!==null) totalAting+=ating;
+    const cols=meses.map((m,mi)=>`<td><input type="text" inputmode="decimal" value="${resPorMes[mi]??''}" ${bloqueado?'disabled':''} style="width:74px" onblur="this.value=this.value.replace(',','.');qSalvarRes(${ind.id},'${m.pkey}',this.value)"></td>`).join('');
+    html+=`<tr>
+      <td style="font-weight:500;max-width:200px">${ind.nome}</td>
+      <td><span class="badge ${ind.sentido==='maior'?'badge-green':'badge-amber'}">${ind.sentido==='maior'?'↑':'↓'}</span></td>
+      <td class="mono">${(ind.peso*100).toFixed(0)}%</td>
+      <td class="mono" style="color:var(--text3)">${vFmt(ind.m85,ind.formato)}</td>
+      <td class="mono" style="color:var(--text3)">${vFmt(ind.m90,ind.formato)}</td>
+      <td class="mono" style="color:var(--text3)">${vFmt(ind.m95,ind.formato)}</td>
+      <td class="mono" style="font-weight:700">${vFmt(ind.m100,ind.formato)}</td>
+      ${cols}
+      <td class="mono" style="font-weight:600">${media!==null?media.toFixed(1):'—'}</td>
+      <td class="mono" style="color:${ating===null?'var(--text3)':ating===0?'var(--red)':ating>=ind.peso*0.95?'var(--green)':'var(--amber)'}">${ating!==null?(ating/ind.peso*100).toFixed(1)+'%':'—'}</td>
+    </tr>`;
+  });
+  const fatMedia=qFatMedia();
+  const fatContrib=qGetFat();
+  const finalPct = totalAting>0 ? Math.max(0, totalAting + fatContrib) : null;
+  html+=`<tfoot>
+    <tr><td colspan="2" style="font-weight:600;color:var(--text2);font-size:12px">Total do setor</td><td class="mono" style="font-weight:700">${(totalPeso*100).toFixed(0)}%</td>
+    <td colspan="${5+meses.length}"></td>
+    <td class="mono" style="font-weight:800;font-size:15px;color:${finalPct===null?'var(--text3)':finalPct>=0.85?'var(--green)':finalPct>0?'var(--amber)':'var(--red)'}">${finalPct!==null?(finalPct*100).toFixed(1)+'%':'—'}</td></tr>
+    <tr><td colspan="3" style="font-size:11px;color:var(--text3)">+ Faturamento (média do ciclo)</td><td colspan="${6+meses.length}" style="font-size:11px;color:var(--text3)">${fatMedia!==null?fatMedia.toFixed(1)+'% × '+String(qFatMult()).replace('.',',')+' = +'+(fatContrib*100).toFixed(1)+'%':'sem faturamento lançado pelo RH ainda'}</td></tr>
+  </tfoot></table></div>`;
+  $('q-lanc-tabs').innerHTML=tabs;
+  $('q-lanc-content').innerHTML=html;
+}
+function qEnsureRes(pkey,rKey){
+  if(!qDB.resultados[pkey]) qDB.resultados[pkey]={};
+  if(!qDB.resultados[pkey][rKey]) qDB.resultados[pkey][rKey]={};
+}
+function qSalvarRes(indId, pkey, valor){
+  if(!qPodeLancar()) return;
+  const rKey=qRKey(); qEnsureRes(pkey,rKey);
+  const v=String(valor).replace(',','.');
+  if(v===''||isNaN(parseFloat(v))) delete qDB.resultados[pkey][rKey][indId];
+  else qDB.resultados[pkey][rKey][indId]=parseFloat(v);
+  qSave(); renderQLancTable();
+}
+
+/* ---------- PAINEL (navegação livre por qualquer ciclo, só leitura) ---------- */
+function renderQPainel(){
+  const anoAtual=new Date().getFullYear();
+  const anos=[]; for(let a=anoAtual-2;a<=anoAtual+1;a++) anos.push(a);
+  $('q-painel-inner').innerHTML=`
+    <div class="card">
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <div class="periodo-sel">
+          <span style="font-size:12px;font-weight:600;color:var(--text2)">Referência:</span>
+          <select onchange="qDB.periodo.mes=+this.value;qSave();renderQPainel()">${vMESES.map((m,i)=>`<option value="${i+1}" ${qDB.periodo.mes===i+1?'selected':''}>${m}</option>`).join('')}</select>
+          <select onchange="qDB.periodo.ano=+this.value;qSave();renderQPainel()">${anos.map(a=>`<option ${qDB.periodo.ano===a?'selected':''}>${a}</option>`).join('')}</select>
+        </div>
+        <select class="filters" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px" onchange="qPainelMod=this.value;renderQPainel()">
+          <option value="" ${qPainelMod===''?'selected':''}>Todas as periodicidades</option>
+          <option value="trimestral" ${qPainelMod==='trimestral'?'selected':''}>Trimestral</option>
+          <option value="semestral" ${qPainelMod==='semestral'?'selected':''}>Semestral</option>
+          <option value="anual" ${qPainelMod==='anual'?'selected':''}>Anual</option>
+        </select>
+      </div>
+    </div>
+    <div class="kpis" id="q-painel-kpis"></div>
+    <div class="card">
+      <h3>Resultado por setor</h3>
+      <div class="card-sub">Ciclo calculado com base na referência acima.</div>
+      <div class="tbl-wrap" style="margin-top:8px"><table>
+        <thead><tr><th>Setor / turno / cargo</th><th>Period.</th><th>Ciclo</th><th>Bruto</th><th>Fat.</th><th>Final</th><th>Status</th></tr></thead>
+        <tbody id="q-painel-tbody"></tbody></table></div>
+    </div>`;
+
+  const modulos = qPainelMod?[qPainelMod]:['trimestral','semestral','anual'];
+  const combos=[];
+  modulos.forEach(mod=>{
+    const setoresUsados=[...new Set(qDB.indicadores.filter(i=>i.periodicidade===mod).map(i=>i.setor))].filter(vSetorPermitido);
+    setoresUsados.forEach(setor=>{
+      const inds=qDB.indicadores.filter(i=>i.setor===setor&&i.periodicidade===mod);
+      const turnos=[...new Set(inds.filter(i=>i.turno).map(i=>i.turno))];
+      if(turnos.length===0){
+        const funcoes=[...new Set(inds.filter(i=>i.funcao).map(i=>i.funcao))];
+        if(funcoes.length===0) combos.push({setor,turno:'',funcao:'',modulo:mod});
+        else funcoes.forEach(f=>combos.push({setor,turno:'',funcao:f,modulo:mod}));
+      } else {
+        turnos.forEach(t=>{
+          const indsT=inds.filter(i=>i.turno===t||!i.turno);
+          const funcoes=[...new Set(indsT.filter(i=>i.funcao).map(i=>i.funcao))];
+          if(funcoes.length===0) combos.push({setor,turno:t,funcao:'',modulo:mod});
+          else funcoes.forEach(f=>combos.push({setor,turno:t,funcao:f,modulo:mod}));
+        });
+      }
+    });
+  });
+
+  let totalFinal=0,count=0,acima=0;
+  const rows=combos.map(c=>{
+    const bruto=qCalcBrutoCombo(c.setor,c.turno,c.funcao,c.modulo);
+    const fat=qGetFat(c.modulo);
+    const final=bruto!==null?Math.max(0,bruto+fat):null;
+    if(final!==null){ totalFinal+=final; count++; if(final>=0.85) acima++; }
+    let label=c.setor;
+    if(c.turno) label+=` · ${c.turno}`;
+    if(c.funcao) label+=` / ${c.funcao}`;
+    return `<tr>
+      <td style="font-weight:500;font-size:12px">${label}</td>
+      <td><span class="badge badge-gray">${qModNome(c.modulo)}</span></td>
+      <td style="font-size:11px;color:var(--text3)">${qCicloLabelPara(c.modulo)}</td>
+      <td class="mono" style="font-weight:600">${bruto!==null?(bruto*100).toFixed(1)+'%':'—'}</td>
+      <td class="mono" style="color:${fat>0?'var(--green)':'var(--text3)'}">${fat>0?'+'+(fat*100).toFixed(1)+'%':'—'}</td>
+      <td class="mono" style="font-weight:700;font-size:15px;color:${final===null?'var(--text3)':final>=0.85?'var(--green)':final>0?'var(--amber)':'var(--red)'}">${final!==null?(final*100).toFixed(1)+'%':'—'}</td>
+      <td>${final!==null?vStatusBadge(final):'<span class="badge badge-gray">—</span>'}</td>
+    </tr>`;
+  });
+  $('q-painel-tbody').innerHTML = rows.join('') || '<tr><td colspan="7" class="empty-state">Nenhum dado disponível</td></tr>';
+
+  const media=count>0?totalFinal/count:null;
+  $('q-painel-kpis').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Média geral</div><div class="stat-value" style="color:${media===null?'var(--text3)':media>=0.85?'var(--green)':media>0?'var(--amber)':'var(--red)'}">${media!==null?(media*100).toFixed(1)+'%':'—'}</div><div class="stat-sub">todos os setores</div></div>
+    <div class="stat-card"><div class="stat-label">Acima de 85%</div><div class="stat-value" style="color:var(--green)">${acima}</div><div class="stat-sub">de ${combos.length} combos</div></div>
+    <div class="stat-card"><div class="stat-label">Referência</div><div class="stat-value" style="font-size:18px">${vMESES[qDB.periodo.mes-1]}</div><div class="stat-sub">${qDB.periodo.ano}</div></div>`;
+}
+function qCalcBrutoCombo(setor,turno,funcao,mod){
+  const meses=qMesesCiclo(mod,qDB.periodo.mes,qDB.periodo.ano);
+  const rKey=`${setor}||${turno||''}${funcao?'||'+funcao:''}`;
+  const inds=qDB.indicadores.filter(i=>i.setor===setor&&i.periodicidade===mod&&(i.turno||'')===(turno||'')&&(i.funcao||'')===(funcao||''));
+  if(!inds.length) return null;
+  let total=0;
+  inds.forEach(ind=>{
+    const resPorMes=meses.map(m=>{ const s=((qDB.resultados[m.pkey]||{})[rKey]||{}); return s[ind.id]!==undefined?s[ind.id]:null; });
+    const comValor=resPorMes.some(v=>v!==null);
+    const media=comValor?resPorMes.reduce((s,v)=>s+(v!==null?v:0),0)/meses.length:null;
+    if(media!==null) total+=vCalcAting(ind,media);
+  });
+  return total;
 }
 
 </script>
