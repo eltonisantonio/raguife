@@ -163,6 +163,140 @@
   .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);font-weight:600}
   .stat-value{font-size:22px;font-weight:700;margin-top:4px}
   .stat-sub{font-size:11px;color:var(--text3);margin-top:2px}
+
+  /* ===================== [NOVO] TEMA ESCURO ===================== */
+  html[data-theme="dark"]{
+    --verde:#12492f; --verde2:#176038;
+    --accent:#8aad38; --accent2:#9dbf4a;
+    --surface:#12161a; --surface2:#1a2026; --white:#1b2228;
+    --border:#2b343c;
+    --text1:#e6edf3; --text2:#a9b6c2; --text3:#71808e;
+    --green:#3fb96b; --red:#e5665a; --amber:#e2a33c; --blue:#5fa8dd;
+    --shadow:0 2px 14px rgba(0,0,0,.45);
+    color-scheme:dark;
+  }
+  html[data-theme="dark"] body{background:var(--surface)}
+  html[data-theme="dark"] .card,
+  html[data-theme="dark"] .modal,
+  html[data-theme="dark"] .stat-card,
+  html[data-theme="dark"] .login-card,
+  html[data-theme="dark"] .modchip,
+  html[data-theme="dark"] .setor-chip,
+  html[data-theme="dark"] .add-row input,
+  html[data-theme="dark"] .filters select,
+  html[data-theme="dark"] .periodo-sel select,
+  html[data-theme="dark"] .field input,
+  html[data-theme="dark"] .field select,
+  html[data-theme="dark"] .login-field input,
+  html[data-theme="dark"] .lanc-table input{background:var(--white);color:var(--text1)}
+  html[data-theme="dark"] .btn-ghost{color:var(--text2)}
+  html[data-theme="dark"] .tag-admin,
+  html[data-theme="dark"] .badge-green{background:#173a26;color:#7fd3a0}
+  html[data-theme="dark"] .badge-blue{background:#17303f;color:#7fc0e8}
+  html[data-theme="dark"] .badge-amber{background:#3b2f16;color:#e8c37f}
+  html[data-theme="dark"] .badge-red,
+  html[data-theme="dark"] .fatal-banner{background:#3a1e1b;color:#f0a49b;border-color:#5a2f2a}
+  html[data-theme="dark"] .btn-danger{border-color:#5a2f2a}
+  html[data-theme="dark"] .period-tag.trimestral{background:#17303f;color:#7fc0e8}
+  html[data-theme="dark"] .period-tag.semestral{background:#2f1f3b;color:#c79de0}
+  html[data-theme="dark"] .period-tag.anual{background:#3b2f16;color:#e8c37f}
+  html[data-theme="dark"] .input-ro{background:var(--surface2)}
+  html[data-theme="dark"] #login-screen{background:#0c1b13}
+
+  /* ===================== [NOVO] TOPBAR ===================== */
+  .topbar{display:none;align-items:center;gap:10px;position:sticky;top:0;z-index:60;
+    background:var(--verde);color:#fff;padding:10px 14px}
+  .topbar .tb-title{font-weight:700;letter-spacing:1px;font-size:14px;flex:1}
+  .icon-btn{background:rgba(255,255,255,.12);border:none;color:inherit;width:34px;height:34px;
+    border-radius:9px;cursor:pointer;font-size:15px;display:inline-flex;align-items:center;justify-content:center;
+    transition:background .15s}
+  .icon-btn:hover{background:rgba(255,255,255,.25)}
+  .desk-tools{position:fixed;top:16px;right:18px;z-index:55;display:flex;gap:8px}
+  .desk-tools .icon-btn{background:var(--white);color:var(--text2);border:1px solid var(--border);box-shadow:var(--shadow)}
+  .desk-tools .icon-btn:hover{color:var(--verde);border-color:var(--verde)}
+  .sb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:none}
+  .sb-overlay.show{display:block}
+
+  /* ===================== [NOVO] RESPONSIVO ===================== */
+  @media(max-width:900px){
+    .topbar{display:flex}
+    .desk-tools{display:none}
+    #app{grid-template-columns:1fr !important}
+    .sidebar{position:fixed;top:0;left:0;bottom:0;width:250px;z-index:80;
+      transform:translateX(-100%);transition:transform .22s ease;box-shadow:0 0 40px rgba(0,0,0,.4)}
+    .sidebar.open{transform:translateX(0)}
+    .content{padding:16px 14px;height:auto;min-height:calc(100vh - 54px)}
+    .page-title{font-size:19px}
+    .card{padding:16px}
+    .row .field{min-width:100%}
+    .kpis{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+    .modal{padding:20px}
+  }
+  @media(max-width:520px){
+    .kpis{grid-template-columns:1fr 1fr}
+    .stat-value{font-size:18px}
+    .btn{padding:9px 14px}
+    .subnav{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+    .subtab{white-space:nowrap}
+  }
+
+  /* ===================== [NOVO] TABELAS ===================== */
+  .tbl-wrap{max-height:none}
+  table tbody tr{transition:background .12s}
+  table tbody tr:hover{background:var(--surface2)}
+  html[data-theme="dark"] table tbody tr:hover{background:#1f272e}
+  .card table thead th{position:sticky;top:0;background:var(--white);z-index:2;box-shadow:inset 0 -1px 0 var(--border)}
+  html[data-theme="dark"] .card table thead th{background:var(--white)}
+  .lanc-table input:focus,.field input:focus,.field select:focus{box-shadow:0 0 0 3px rgba(115,150,48,.22)}
+  .lanc-table tr.row-focus{background:rgba(115,150,48,.10)}
+
+  /* ===================== [NOVO] PALETA DE COMANDOS ===================== */
+  .cmdk-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:none;
+    align-items:flex-start;justify-content:center;padding:12vh 16px}
+  .cmdk-bg.show{display:flex}
+  .cmdk{background:var(--white);border:1px solid var(--border);border-radius:14px;width:560px;max-width:100%;
+    box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden}
+  .cmdk input{width:100%;border:none;outline:none;padding:16px 18px;font-size:15px;
+    background:transparent;color:var(--text1);border-bottom:1px solid var(--border)}
+  .cmdk-list{max-height:320px;overflow-y:auto;padding:6px}
+  .cmdk-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;cursor:pointer;font-size:13px}
+  .cmdk-item .k{margin-left:auto;font-size:10px;color:var(--text3);border:1px solid var(--border);
+    border-radius:5px;padding:1px 6px}
+  .cmdk-item.sel,.cmdk-item:hover{background:var(--surface2);color:var(--verde)}
+  .cmdk-empty{padding:22px;text-align:center;color:var(--text3);font-size:13px}
+  .cmdk-hint{padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);
+    display:flex;gap:14px;flex-wrap:wrap}
+
+  /* ===================== [NOVO] TOASTS EMPILHADOS ===================== */
+  #toast-stack{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;
+    gap:8px;align-items:flex-end;pointer-events:none}
+  .toast2{padding:11px 16px;border-radius:10px;font-size:13px;font-weight:600;color:#fff;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transform:translateY(10px);
+    transition:all .22s;max-width:min(360px,88vw);pointer-events:auto;display:flex;align-items:center;gap:10px}
+  .toast2.show{opacity:1;transform:translateY(0)}
+  .toast2.ok{background:var(--green)} .toast2.error{background:var(--red)}
+  .toast2.info{background:var(--blue)} .toast2.warn{background:var(--amber)}
+  @media(max-width:520px){#toast-stack{left:14px;right:14px;bottom:14px;align-items:stretch}
+    .toast2{max-width:100%}}
+
+  /* ===================== [NOVO] SENHA / LOGIN ===================== */
+  .pw-wrap{position:relative}
+  .pw-wrap input{padding-right:46px !important}
+  .pw-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;
+    cursor:pointer;font-size:15px;color:var(--text3);padding:4px}
+  .pw-eye:hover{color:var(--verde)}
+  .login-link{margin-top:10px;text-align:center;font-size:12px;color:var(--text3);cursor:pointer}
+  .login-link:hover{color:var(--verde);text-decoration:underline}
+
+  /* ===================== [NOVO] CARREGAMENTO ===================== */
+  .skel{background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 37%,var(--surface2) 63%);
+    background-size:400% 100%;animation:skel 1.2s ease-in-out infinite;border-radius:8px}
+  @keyframes skel{0%{background-position:100% 50%}100%{background-position:0 50%}}
+  .page-fade{animation:pf .18s ease}
+  @keyframes pf{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  *:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media print{.sidebar,.topbar,.desk-tools,#toast-stack{display:none !important}
+    #app{grid-template-columns:1fr !important}.content{height:auto;padding:0}}
 </style>
 </head>
 <body>
@@ -176,9 +310,14 @@
     <div class="login-field"><label>E-mail</label>
       <input type="email" id="in-email" placeholder="voce@empresa.com" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="login-field"><label>Senha</label>
-      <input type="password" id="in-senha" placeholder="••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="pw-wrap">
+        <input type="password" id="in-senha" placeholder="••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" class="pw-eye" onclick="uxTogglePw('in-senha',this)" title="Mostrar/ocultar senha">👁</button>
+      </div>
+    </div>
     <button class="login-btn" id="btn-login" onclick="doLogin()">Entrar</button>
     <div class="login-msg" id="login-msg"></div>
+    <div class="login-link" onclick="uxResetSenha()">Esqueci minha senha</div>
 
     <div class="login-toggle" onclick="toggleBootstrap()">Primeiro acesso? Criar o administrador</div>
     <div id="bootstrap-box">
@@ -192,7 +331,19 @@
 </div>
 
 <!-- ===================== APP ===================== -->
+<div class="sb-overlay" id="sb-overlay" onclick="uxSidebar(false)"></div>
+
 <div id="app">
+  <div class="topbar">
+    <button class="icon-btn" onclick="uxSidebar(true)" title="Menu">☰</button>
+    <span class="tb-title">RAGUIFE</span>
+    <button class="icon-btn" onclick="uxCmdk(true)" title="Buscar (Ctrl+K)">⌕</button>
+    <button class="icon-btn" onclick="uxTheme()" id="tb-theme" title="Tema">◐</button>
+  </div>
+  <div class="desk-tools">
+    <button class="icon-btn" onclick="uxCmdk(true)" title="Buscar (Ctrl+K)">⌕</button>
+    <button class="icon-btn" onclick="uxTheme()" id="dt-theme" title="Alternar tema claro/escuro">◐</button>
+  </div>
   <aside class="sidebar">
     <div class="sidebar-logo"><img class="sidebar-logo-img" src="data:image/png;base64,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" alt="Raguife"></div>
     <div class="sidebar-user">
@@ -215,7 +366,7 @@
     <div class="field" style="margin-top:6px"><label>Acesso</label>
       <div class="checks">
         <label class="check"><input type="checkbox" id="e-admin">Administrador</label>
-        <label class="check"><input type="checkbox" id="e-mod-variavel">Sistema Variável</label>
+        <label class="check"><input type="checkbox" id="e-mod-variavel">Prêmios Mensais</label>
         <label class="check"><input type="checkbox" id="e-mod-premio">Prêmio Individual</label>
         <label class="check"><input type="checkbox" id="e-mod-periodico">Prêmio Periódico</label>
       </div>
@@ -245,6 +396,17 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<div id="toast-stack"></div>
+
+<div class="cmdk-bg" id="cmdk-bg" onclick="if(event.target===this)uxCmdk(false)">
+  <div class="cmdk">
+    <input id="cmdk-input" placeholder="Buscar páginas, ações e atalhos…" autocomplete="off">
+    <div class="cmdk-list" id="cmdk-list"></div>
+    <div class="cmdk-hint">
+      <span>↑↓ navegar</span><span>↵ abrir</span><span>Esc fechar</span><span>Ctrl+K abrir</span>
+    </div>
+  </div>
+</div>
 
 <!-- ===================== FIREBASE ===================== -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -280,7 +442,7 @@ let premUnsub = null;        // assinatura em tempo real do Prêmio Individual
 let qUnsub = null;           // assinatura em tempo real do Prêmio Periódico
 
 const MODULOS = [
-  { id:'variavel', nome:'Sistema Variável' },
+  { id:'variavel', nome:'Prêmios Mensais' },
   { id:'premio',   nome:'Prêmio Individual' },
   { id:'periodico', nome:'Prêmio Periódico' }
 ];
@@ -482,7 +644,7 @@ function renderUsuarios(){
         <label>Acesso</label>
         <div class="checks">
           <label class="check"><input type="checkbox" id="u-admin">Administrador</label>
-          <label class="check"><input type="checkbox" id="u-mod-variavel">Sistema Variável</label>
+          <label class="check"><input type="checkbox" id="u-mod-variavel">Prêmios Mensais</label>
           <label class="check"><input type="checkbox" id="u-mod-premio">Prêmio Individual</label>
           <label class="check"><input type="checkbox" id="u-mod-periodico">Prêmio Periódico</label>
         </div>
@@ -848,8 +1010,9 @@ function varSave(){
 
 /* ---------- SHELL DO MÓDULO ---------- */
 function renderVariavel(){
+  vPainelPer=null;   // ao entrar no módulo, o painel parte do período atual
   $('content').innerHTML=`
-    <div class="page-title">Sistema Variável</div>
+    <div class="page-title">Prêmios Mensais</div>
     <div class="page-sub">Premiação por setor, turno e indicadores.</div>
     <div class="subnav" id="v-subnav"></div>
     <div id="var-content"><div class="empty-state">Carregando…</div></div>
@@ -1749,7 +1912,34 @@ function vSetFolhaSub(s){ folhaSub=s; renderVarFolha(); }
 
 /* ===================== PAINEL DE GESTORES ===================== */
 let vPainelMod = '';
-function vRenderPainel(){
+/* [NOVO] O Painel passa a ter período próprio, só de leitura.
+   Antes, trocar o mês aqui alterava (e salvava) o período de lançamento de todo
+   o módulo. Agora o painel usa uma cópia temporária: as funções de cálculo
+   continuam lendo varDB.periodo, mas o valor é restaurado ao final do desenho. */
+var vPainelPer=null;      // período que o painel está exibindo
+var vPainelReal={mes:0,ano:0}; // período real de lançamento (para o aviso)
+
+function vPainelSetPeriodo(campo, valor){
+  if(!vPainelPer) vPainelPer={mes:varDB.periodo.mes, ano:varDB.periodo.ano};
+  vPainelPer[campo]=+valor;
+  vRenderPainel();
+}
+function vPainelVoltarAtual(){
+  vPainelPer={mes:varDB.periodo.mes, ano:varDB.periodo.ano};
+  vRenderPainel();
+}
+function vComPeriodoDoPainel(fn){
+  if(!vPainelPer) vPainelPer={mes:varDB.periodo.mes, ano:varDB.periodo.ano};
+  vPainelReal={mes:varDB.periodo.mes, ano:varDB.periodo.ano};
+  const original=varDB.periodo;
+  varDB.periodo={mes:vPainelPer.mes, ano:vPainelPer.ano};
+  try{ return fn(); }
+  finally{ varDB.periodo=original; }   // nada é salvo: o lançamento não muda
+}
+function vRenderPainel(){ return vComPeriodoDoPainel(vRenderPainelCore); }
+
+function vRenderPainelCore(){
+  vTodosAbertos=false;
   const anoAtual=new Date().getFullYear();
   const anos=[]; for(let a=anoAtual-2;a<=anoAtual+1;a++) anos.push(a);
   $('v-folha-inner').innerHTML=`
@@ -1757,15 +1947,19 @@ function vRenderPainel(){
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <div class="periodo-sel">
           <span style="font-size:12px;font-weight:600;color:var(--text2)">Período:</span>
-          <select onchange="varDB.periodo.mes=+this.value;varSave();vRenderPainel()">${vMESES.map((m,i)=>`<option value="${i+1}" ${varDB.periodo.mes===i+1?'selected':''}>${m}</option>`).join('')}</select>
-          <select onchange="varDB.periodo.ano=+this.value;varSave();vRenderPainel()">${anos.map(a=>`<option ${varDB.periodo.ano===a?'selected':''}>${a}</option>`).join('')}</select>
+          <select onchange="vPainelSetPeriodo('mes',this.value)">${vMESES.map((m,i)=>`<option value="${i+1}" ${varDB.periodo.mes===i+1?'selected':''}>${m}</option>`).join('')}</select>
+          <select onchange="vPainelSetPeriodo('ano',this.value)">${anos.map(a=>`<option ${varDB.periodo.ano===a?'selected':''}>${a}</option>`).join('')}</select>
+          ${vPainelPer && (vPainelPer.mes!==vPainelReal.mes || vPainelPer.ano!==vPainelReal.ano)
+            ? `<span class="badge badge-blue" title="O período de lançamento continua em ${vMESES[vPainelReal.mes-1]}/${vPainelReal.ano}">👁 Só visualização</span>
+               <button class="btn btn-ghost btn-sm" onclick="vPainelVoltarAtual()">Voltar para ${vMESES[vPainelReal.mes-1]}/${vPainelReal.ano}</button>` : ''}
         </div>
         <select class="filters" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px" onchange="vPainelMod=this.value;vRenderPainel()">
           <option value="" ${vPainelMod===''?'selected':''}>Todos os módulos</option>
           <option value="adm" ${vPainelMod==='adm'?'selected':''}>Administrativo</option>
           <option value="industria" ${vPainelMod==='industria'?'selected':''}>Operação</option>
         </select>
-        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="vImprimirPainel()">🖨 PDF</button>
+        <button class="btn btn-ghost btn-sm" id="v-btn-exp" style="margin-left:auto" onclick="vExpandirTodos()">▼ Expandir todos</button>
+        <button class="btn btn-ghost btn-sm" onclick="vImprimirPainel()">🖨 PDF</button>
       </div>
     </div>
     <div class="kpis" id="v-painel-kpis"></div>
@@ -1864,6 +2058,23 @@ function vToggleDet(idx){
   const open=rows.length>0 && rows[0].style.display!=='none';
   rows.forEach(r=>r.style.display=open?'none':'table-row');
   if(arrow) arrow.style.transform=open?'':'rotate(90deg)';
+}
+/* [NOVO] Expandir/recolher todos os detalhes do painel de uma vez.
+   Útil para gerar o PDF já com todos os indicadores visíveis. */
+var vTodosAbertos=false; /* var: garante disponibilidade em qualquer bloco */
+function vExpandirTodos(abrir){
+  const alvo = (abrir===undefined) ? !vTodosAbertos : !!abrir;
+  vTodosAbertos = alvo;
+  const idxs=new Set();
+  document.querySelectorAll('#v-painel-tbody tr[class*="vgd-"]').forEach(tr=>{
+    (tr.className.match(/vgd-(\d+)/g)||[]).forEach(c=>idxs.add(c.replace('vgd-','')));
+  });
+  idxs.forEach(idx=>{
+    document.querySelectorAll('.vgd-'+idx).forEach(r=>r.style.display=alvo?'table-row':'none');
+    const a=$('vgar-'+idx); if(a) a.style.transform=alvo?'rotate(90deg)':'';
+  });
+  const btn=$('v-btn-exp');
+  if(btn) btn.innerHTML = alvo ? '▲ Recolher todos' : '▼ Expandir todos';
 }
 
 </script>
@@ -2430,7 +2641,9 @@ function renderFolha(){
     <div class="page-title">Folha de Prêmio</div>
     <div class="page-sub">Cálculo em R$ por funcionário. Escolha a origem do atingimento.</div>
     <div style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="folhaExportarMIXConsolidado()">⤓ Arquivo MIX (consolidado)</button>
+      <button class="btn btn-primary" onclick="folhaExportarMIXModulo('mensal')">⤓ MIX · Prêmio Mensal</button>
+      <button class="btn btn-primary" onclick="folhaExportarMIXModulo('individual')">⤓ MIX · Prêmio Individual</button>
+      <button class="btn btn-ghost" onclick="folhaExportarMIXConsolidado()">⤓ MIX consolidado</button>
       <button class="btn btn-ghost" onclick="folhaExportarConferencia()">⤓ Conferência (auditoria)</button>
     </div>
     <div class="modbar" style="margin-bottom:18px">
@@ -2501,7 +2714,7 @@ function premDefaults(){
     comps:{}
   };
 }
-function pEmptyComp(){ return {funcs:[],ocorr:{},atg:{},faturamento:0,liberado:false,finalizados:{},fechamento:null,atualizado:null}; }
+function pEmptyComp(){ return {funcs:[],ocorr:{},atg:{},atgBy:{},faturamento:0,liberado:false,finalizados:{},fechamento:null,atualizado:null}; }
 function premEnsure(d){
   d=d||{}; const def=premDefaults();
   if(!d.periodo||!d.periodo.mes) d.periodo=def.periodo;
@@ -2518,7 +2731,8 @@ function premSave(){ clearTimeout(pSaveTimer); pSaveTimer=setTimeout(()=>{ PREM_
 
 function pPkey(){ return `${premDB.periodo.ano}-${String(premDB.periodo.mes).padStart(2,'0')}`; }
 function pPeriodLabel(){ return `${pMESES[premDB.periodo.mes-1]}/${premDB.periodo.ano}`; }
-function pComp(){ const k=pPkey(); if(!premDB.comps[k]) premDB.comps[k]=pEmptyComp(); return premDB.comps[k]; }
+function pComp(){ const k=pPkey(); if(!premDB.comps[k]) premDB.comps[k]=pEmptyComp();
+  const c=premDB.comps[k]; if(!c.atgBy) c.atgBy={}; return c; }
 
 /* ---------- motor (idêntico ao original) ---------- */
 function pSalarioFuncao(funcao){ const a=pNorm(funcao); const r=(premDB.funcoesSalarios||[]).find(s=>pNorm(s.funcao)===a); return r?(parseFloat(r.salario)||0):null; }
@@ -2879,6 +3093,64 @@ function pImportar(input){
    Cada funcionário está em apenas um dos módulos (sem soma).
    =================================================================== */
 
+/* [NOVO] Arquivo MIX gerado por módulo, em arquivos separados.
+   'mensal'     -> Prêmios Mensais (atingimento automático por indicadores)
+   'individual' -> Prêmio Individual (atingimento lançado pelos gestores)
+   O layout das colunas é idêntico ao do arquivo consolidado. */
+const FOLHA_MIX_HEADER=['EMPRESA','FILIAL','CHAPA','MATRICULA','MES','ANO','TIPO_ENVELOPE','IDENTIFICADOR','VERBA','QUANTIDADE','USUARIO','MES_SEGUINTE'];
+
+function folhaMixEscreve(linhas, nomeArquivo){
+  const ws=XLSX.utils.aoa_to_sheet([FOLHA_MIX_HEADER,...linhas]);
+  ws['!cols']=[{wch:9},{wch:7},{wch:8},{wch:11},{wch:5},{wch:6},{wch:14},{wch:14},{wch:7},{wch:12},{wch:9},{wch:13}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Planilha1');
+  XLSX.writeFile(wb,nomeArquivo,{bookType:'xls'});
+}
+
+async function folhaExportarMIXModulo(mod){
+  const nomes={mensal:'Prêmio Mensal', individual:'Prêmio Individual', periodico:'Prêmio Periódico'};
+  if(mod==='periodico'){ toast('A regra de pagamento do Prêmio Periódico ainda não está definida no sistema','error'); return; }
+  setSync(true,'Gerando arquivo…');
+  try{
+    const linhas=[]; const refs={}; const dupes=[];
+    function addLine(ref,periodo,verba,final){
+      const key=String(ref).trim();
+      if(refs[key]){ dupes.push(key); return; }
+      refs[key]=true;
+      linhas.push(['','','', key, periodo.mes, periodo.ano, '', '', verba, Math.round(final*100)/100, '', '']);
+    }
+
+    let periodo, verba;
+    if(mod==='mensal'){
+      const vSnap=await VAR_REF.get();
+      varDB=varEnsure(vParse(vSnap.exists?vSnap.data():{}));
+      foCarregar();
+      periodo=varDB.periodo; verba=varDB.folha.cfg.verba;
+      foFuncs.forEach(f=>{ const c=foCalcular(f); if(!c.fora && c.final>0) addLine(f.ref, periodo, verba, c.final); });
+    } else {
+      const pSnap=await PREM_REF.get();
+      premDB=premEnsure(premParse(pSnap.exists?pSnap.data():{}));
+      periodo=premDB.periodo; verba=premDB.cfg.verba;
+      (pComp().funcs||[]).forEach(f=>{ const c=pCalc(f); if(!c.fora && c.final>0) addLine(f.ref, periodo, verba, c.final); });
+    }
+
+    if(!linhas.length){
+      toast(`Nenhum funcionário com valor a pagar em ${nomes[mod]}`,'error');
+      setSync(true,'Online · '+vHora()); return;
+    }
+    const mm=String(periodo.mes).padStart(2,'0');
+    const slug={mensal:'Mensal', individual:'Individual', periodico:'Periodico'}[mod];
+    folhaMixEscreve(linhas, `Importacao_Premio_${slug}_${mm}-${periodo.ano}.xls`);
+
+    if(dupes.length){
+      const u=[...new Set(dupes)];
+      toast(`${nomes[mod]}: ${linhas.length} linhas. ⚠ ${u.length} referência(s) repetida(s) ignorada(s)`,'error');
+    } else {
+      toast(`${nomes[mod]}: arquivo gerado com ${linhas.length} funcionários`);
+    }
+    setSync(true,'Online · '+vHora());
+  }catch(e){ console.warn(e); toast('Erro ao gerar o arquivo','error'); setSync(false,'Erro'); }
+}
+
 async function folhaExportarMIXConsolidado(){
   setSync(true,'Gerando arquivo…');
   try{
@@ -2975,13 +3247,19 @@ function renderPremioGestor(){
       : !meus.length ? `<div class="card"><div class="empty-state">${(c.funcs||[]).length?'Nenhum funcionário dos seus departamentos nesta competência.':'O RH ainda não importou os funcionários desta competência.'}</div></div>`
       : `<div class="card">
           <h3>Seus funcionários (${meus.length})</h3>
-          <div class="card-sub">Informe o atingimento de cada um (0 a ${premDB.cfg.atgMax}%). O proporcional e as ocorrências são tratados pelo RH.</div>
-          <input type="text" placeholder="Buscar nome…" oninput="pFiltrar('pg-tbody',this.value)" style="width:100%;max-width:320px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;margin:6px 0 12px;outline:none">
+          <div class="card-sub">Informe o atingimento de cada um (0 a ${premDB.cfg.atgMax}%). O proporcional e as ocorrências são tratados pelo RH.
+            Se outro gestor divide o mesmo departamento, o que ele já lançou aparece preenchido — não precisa lançar de novo.</div>
+          <div id="pg-contador" style="margin:8px 0 12px"></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+            <input type="text" placeholder="Buscar nome…" oninput="pFiltrar('pg-tbody',this.value)" style="flex:1;min-width:200px;max-width:320px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;outline:none">
+            <label class="check"><input type="checkbox" id="pg-so-pend" onchange="pFiltrarPendentes(this.checked)">Mostrar só pendentes</label>
+          </div>
           <div class="tbl-wrap"><table class="lanc-table">
             <thead><tr><th>Ref</th><th>Nome</th><th>Função</th><th>Depto</th><th>Atingimento %</th></tr></thead>
             <tbody id="pg-tbody">${meus.map(f=>{
               const atg=c.atg[f.ref]??'';
-              return `<tr data-nome="${pNorm(f.nome)}">
+              const porOutro = atg!=='' && c.atgBy[f.ref] && c.atgBy[f.ref]!==currentUser.uid;
+              return `<tr data-nome="${pNorm(f.nome)}" data-lancado="${atg===''?'0':'1'}"${porOutro?' title="Lançado por outro gestor do departamento"':''}>
                 <td class="mono" style="font-size:11px">${f.ref}</td>
                 <td style="font-weight:600">${f.nome}</td>
                 <td style="font-size:11px;color:var(--text2)">${f.funcao||'—'}</td>
@@ -2995,11 +3273,43 @@ function renderPremioGestor(){
             ${finalizado&&!c.fechamento?`<button class="btn btn-ghost" onclick="pGestorReabrir()">Reabrir meu lançamento</button>`:''}
           </div>
         </div>`}`;
+  pAtualizaContadorGestor();
+}
+
+/* [NOVO] Mostra ao gestor quantos dos SEUS funcionários já estão lançados,
+   independentemente de quem lançou — evita a impressão de que cada gestor
+   precisa lançar os mesmos 65 funcionários. */
+function pAtualizaContadorGestor(){
+  const box=$('pg-contador'); if(!box) return;
+  const c=pComp(), meus=meusFuncs();
+  const lancado=f=>c.atg[f.ref]!==undefined && c.atg[f.ref]!=='';
+  const total=meus.length;
+  const feitos=meus.filter(lancado).length;
+  const porMim=meus.filter(f=>lancado(f) && c.atgBy[f.ref]===currentUser.uid).length;
+  const porOutros=feitos-porMim;
+  const pend=total-feitos;
+  box.innerHTML=`<div class="kpis" style="margin-bottom:0">
+    <div class="stat-card"><div class="stat-label">Já lançados</div>
+      <div class="stat-value" style="color:${pend?'var(--amber)':'var(--green)'}">${feitos}/${total}</div>
+      <div class="stat-sub">${total?Math.round(feitos/total*100):0}% do seu time</div></div>
+    <div class="stat-card"><div class="stat-label">Faltam lançar</div>
+      <div class="stat-value" style="color:${pend?'var(--red)':'var(--green)'}">${pend}</div>
+      <div class="stat-sub">${pend?'sem atingimento informado':'tudo pronto'}</div></div>
+    <div class="stat-card"><div class="stat-label">Por outro gestor</div>
+      <div class="stat-value">${porOutros}</div>
+      <div class="stat-sub">já lançados por quem divide o depto.</div></div>
+  </div>`;
+}
+function pFiltrarPendentes(ativo){
+  document.querySelectorAll('#pg-tbody tr').forEach(tr=>{
+    tr.style.display = (ativo && tr.dataset.lancado==='1') ? 'none' : '';
+  });
 }
 function pGestorSetAtg(ref,val){
   const c=pComp();
-  if(val===''||val===null) delete c.atg[ref];
-  else c.atg[ref]=pClamp(parseFloat(val)||0,0,premDB.cfg.atgMax);
+  if(val===''||val===null){ delete c.atg[ref]; delete c.atgBy[ref]; }
+  else { c.atg[ref]=pClamp(parseFloat(val)||0,0,premDB.cfg.atgMax); c.atgBy[ref]=currentUser.uid; }
+  pAtualizaContadorGestor();
   pGestorDirty.add(ref);
   clearTimeout(pSaveTimer); pSaveTimer=setTimeout(pSaveGestor,700);
 }
@@ -3014,8 +3324,9 @@ async function pSaveGestor(){
     // mescla só os atingimentos que ESTE gestor mexeu
     pGestorDirty.forEach(ref=>{
       const v=lc.atg[ref];
-      if(v===undefined||v===''||v===null) delete sc.atg[ref];
-      else sc.atg[ref]=v;
+      sc.atgBy=sc.atgBy||{};
+      if(v===undefined||v===''||v===null){ delete sc.atg[ref]; delete sc.atgBy[ref]; }
+      else { sc.atg[ref]=v; sc.atgBy[ref]=currentUser.uid; }
     });
     // finalização deste gestor
     sc.finalizados=sc.finalizados||{};
@@ -3075,8 +3386,8 @@ async function renderPremioAdmin(){
       <h3>Gestores</h3>
       <div class="card-sub">Apenas para acompanhar quem já finalizou e reabrir se necessário.</div>
       <div class="tbl-wrap" style="margin-top:8px"><table>
-        <thead><tr><th>Gestor</th><th>Departamentos</th><th>Status</th><th></th></tr></thead>
-        <tbody id="pa-gest-tbody"><tr><td colspan="4" class="empty-state">Carregando gestores…</td></tr></tbody>
+        <thead><tr><th>Gestor</th><th>Departamentos</th><th>Cobertura do time</th><th>Lançou</th><th>Status</th><th></th></tr></thead>
+        <tbody id="pa-gest-tbody"><tr><td colspan="6" class="empty-state">Carregando gestores…</td></tr></tbody>
       </table></div>
     </div>`;
 
@@ -3121,13 +3432,33 @@ async function renderPremioAdmin(){
 
   /* ---- lista de gestores (só status/finalização) ---- */
   const tg=$('pa-gest-tbody'); if(!tg) return;
+  const atgBy=c.atgBy||{};
   const grows=gestores.sort((a,z)=>(a.nome||'').localeCompare(z.nome||'')).map(g=>{
     const fin=!!(c.finalizados&&c.finalizados[g.uid]);
-    const status=fin?'<span class="badge badge-green">Finalizado</span>':'<span class="badge badge-gray">Em aberto</span>';
+    // funcionários dos departamentos deste gestor (podem ser os mesmos de outro gestor)
+    const dept=(g.deptos||[]).map(pNorm);
+    const meus=(c.funcs||[]).filter(f=>dept.includes(pNorm(f.depto)));
+    const feitos=meus.filter(lancado).length;
+    const porEle=meus.filter(f=>lancado(f)&&atgBy[f.ref]===g.uid).length;
+    const completo = meus.length>0 && feitos===meus.length;
+    const cobertura = meus.length
+      ? `<span class="mono" style="color:${completo?'var(--green)':'var(--amber)'};font-weight:600">${feitos}/${meus.length}</span>`
+      : '<span style="color:var(--text3)">—</span>';
+    const lancou = porEle
+      ? `<span class="mono">${porEle}</span>`
+      : '<span style="color:var(--text3);font-size:11px">nenhum</span>';
+    // um gestor pode estar "em aberto" mas com o time todo já lançado por um colega
+    const status = fin ? '<span class="badge badge-green">Finalizado</span>'
+      : completo && porEle===0 ? '<span class="badge badge-blue">Coberto por outro gestor</span>'
+      : completo ? '<span class="badge badge-amber">Lançado, falta finalizar</span>'
+      : feitos>0 ? `<span class="badge badge-amber">Faltam ${meus.length-feitos}</span>`
+      : '<span class="badge badge-gray">Em aberto</span>';
     const acao=fin&&!c.fechamento?`<button class="btn btn-ghost btn-sm" onclick="pReabrirGestor('${g.uid}')">Reabrir</button>`:'';
-    return `<tr><td style="font-weight:600">${g.nome||g.email}</td><td style="font-size:11px;color:var(--text2)">${(g.deptos||[]).join(', ')}</td><td>${status}</td><td>${acao}</td></tr>`;
+    return `<tr><td style="font-weight:600">${g.nome||g.email}</td>
+      <td style="font-size:11px;color:var(--text2)">${(g.deptos||[]).join(', ')}</td>
+      <td>${cobertura}</td><td>${lancou}</td><td>${status}</td><td>${acao}</td></tr>`;
   });
-  tg.innerHTML=grows.join('')||'<tr><td colspan="4" class="empty-state">Nenhum gestor cadastrado. Atribua departamentos a um usuário em Usuários.</td></tr>';
+  tg.innerHTML=grows.join('')||'<tr><td colspan="6" class="empty-state">Nenhum gestor cadastrado. Atribua departamentos a um usuário em Usuários.</td></tr>';
 }
 function pToggleLiberado(on){
   const c=pComp();
@@ -3446,7 +3777,8 @@ function pBaixarModeloOcorr(){
 }
 
 /* ---------- (3) PDF do Painel de Gestores (Variável) ---------- */
-function vImprimirPainel(){
+function vImprimirPainel(){ return vComPeriodoDoPainel(vImprimirPainelCore); }
+function vImprimirPainelCore(){
   const tabela=document.querySelector('#v-folha-inner table');
   const kpis=document.getElementById('v-painel-kpis');
   if(!tabela){ toast('Nada para imprimir','error'); return; }
@@ -4136,6 +4468,211 @@ function qCalcBrutoCombo(setor,turno,funcao,mod){
   return total;
 }
 
+</script>
+
+<!-- ===================== [NOVO] MÓDULO DE EXPERIÊNCIA (UX) ===================== -->
+<script>
+/* Este bloco é aditivo: não altera regras de negócio, apenas melhora a interface.
+   Tudo aqui usa o prefixo "ux" para evitar conflito com o código existente. */
+
+/* ---------- 1. TEMA CLARO / ESCURO ---------- */
+function uxAplicaTema(t){
+  document.documentElement.setAttribute('data-theme', t);
+  try{ localStorage.setItem('raguife-tema-v2', t); }catch(e){}
+  const lbl = t==='dark' ? '☀' : '◐';
+  ['tb-theme','dt-theme'].forEach(id=>{ const b=document.getElementById(id); if(b) b.textContent=lbl; });
+}
+function uxTheme(){
+  const atual = document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
+  uxAplicaTema(atual);
+  toast(atual==='dark' ? 'Tema escuro ativado' : 'Tema claro ativado','info');
+}
+(function(){
+  let t=null;
+  try{ t=localStorage.getItem('raguife-tema-v2'); }catch(e){}
+  uxAplicaTema(t==='dark' ? 'dark' : 'light'); // padrão sempre claro
+})();
+
+/* ---------- 2. MENU LATERAL NO CELULAR ---------- */
+function uxSidebar(abrir){
+  const sb=document.querySelector('.sidebar'), ov=document.getElementById('sb-overlay');
+  if(!sb) return;
+  sb.classList.toggle('open', !!abrir);
+  ov.classList.toggle('show', !!abrir);
+  document.body.style.overflow = abrir ? 'hidden' : '';
+}
+
+/* ---------- 3. TOASTS EMPILHADOS ---------- */
+window.toast = function(msg, tipo='ok'){
+  const stack=document.getElementById('toast-stack');
+  if(!stack) return;
+  const ico={ok:'✓',error:'✕',info:'i',warn:'!'}[tipo]||'✓';
+  const el=document.createElement('div');
+  el.className='toast2 '+tipo;
+  el.innerHTML='<span>'+ico+'</span><span></span>';
+  el.lastChild.textContent=msg;
+  stack.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  const fecha=()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),250); };
+  el.onclick=fecha;
+  setTimeout(fecha, tipo==='error' ? 5000 : 3000);
+  while(stack.children.length>4) stack.firstChild.remove();
+};
+
+/* ---------- 4. SENHA: MOSTRAR/OCULTAR E RECUPERAÇÃO ---------- */
+function uxTogglePw(id, btn){
+  const i=document.getElementById(id); if(!i) return;
+  const mostrar = i.type==='password';
+  i.type = mostrar ? 'text' : 'password';
+  btn.textContent = mostrar ? '🙈' : '👁';
+  i.focus();
+}
+async function uxResetSenha(){
+  const campo=document.getElementById('in-email');
+  const email=(campo?campo.value:'').trim();
+  const msg=document.getElementById('login-msg');
+  if(!email){
+    msg.className='login-msg err';
+    msg.textContent='Digite seu e-mail acima e clique novamente';
+    if(campo) campo.focus();
+    return;
+  }
+  try{
+    await auth.sendPasswordResetEmail(email);
+    msg.className='login-msg ok';
+    msg.textContent='Enviamos um link de redefinição para '+email;
+  }catch(e){
+    msg.className='login-msg err';
+    msg.textContent = (typeof traduzErro==='function') ? traduzErro(e) : 'Não foi possível enviar o e-mail';
+  }
+}
+
+/* ---------- 5. PALETA DE COMANDOS (Ctrl+K) ---------- */
+let uxCmdItems=[], uxCmdSel=0;
+
+function uxMontaComandos(){
+  const itens=[];
+  if(typeof currentUser==='object' && currentUser && typeof paginasDisponiveis==='function'){
+    try{
+      paginasDisponiveis().forEach(p=>{
+        itens.push({ico:p.ico||'▦', nome:p.nome, grupo:'Página', run:()=>showPage(p.id)});
+      });
+    }catch(e){}
+  }
+  // Sub-abas do módulo Variável, quando disponíveis
+  if(typeof VAR_PAGES!=='undefined' && typeof vAvailVarPages==='function'){
+    try{
+      vAvailVarPages().forEach(p=>{
+        itens.push({ico:'›', nome:'Variável · '+(p.nome||p.id), grupo:'Página',
+          run:()=>{ showPage('variavel'); setTimeout(()=>{ try{ setVarTab(p.id); }catch(e){} },60); }});
+      });
+    }catch(e){}
+  }
+  itens.push({ico:'◐', nome:'Alternar tema claro/escuro', grupo:'Ação', run:uxTheme});
+  if(typeof vExportarDados==='function')
+    itens.push({ico:'↓', nome:'Exportar dados do Variável', grupo:'Ação', run:vExportarDados});
+  if(typeof vImprimirPainel==='function')
+    itens.push({ico:'⎙', nome:'Imprimir painel do Variável', grupo:'Ação', run:vImprimirPainel});
+  itens.push({ico:'⏻', nome:'Sair do sistema', grupo:'Ação', run:()=>logout()});
+  return itens;
+}
+function uxNorm(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+function uxCmdkRender(){
+  const busca=uxNorm(document.getElementById('cmdk-input').value);
+  const lista=document.getElementById('cmdk-list');
+  const filtrados=uxCmdItems.filter(i=>!busca||uxNorm(i.nome).includes(busca));
+  if(uxCmdSel>=filtrados.length) uxCmdSel=Math.max(0,filtrados.length-1);
+  if(!filtrados.length){ lista.innerHTML='<div class="cmdk-empty">Nada encontrado</div>'; return; }
+  lista.innerHTML=filtrados.map((i,idx)=>
+    `<div class="cmdk-item${idx===uxCmdSel?' sel':''}" data-i="${idx}">
+       <span>${i.ico}</span><span>${i.nome}</span><span class="k">${i.grupo}</span>
+     </div>`).join('');
+  lista.querySelectorAll('.cmdk-item').forEach(el=>{
+    el.onclick=()=>{ const it=filtrados[+el.dataset.i]; uxCmdk(false); setTimeout(()=>it.run(),40); };
+  });
+  const sel=lista.querySelector('.cmdk-item.sel');
+  if(sel) sel.scrollIntoView({block:'nearest'});
+}
+function uxCmdk(abrir){
+  const bg=document.getElementById('cmdk-bg');
+  if(abrir){
+    const app=document.getElementById('app');
+    if(!app || getComputedStyle(app).display==='none') return; // só dentro do sistema
+    uxCmdItems=uxMontaComandos(); uxCmdSel=0;
+    const inp=document.getElementById('cmdk-input');
+    inp.value=''; bg.classList.add('show'); uxCmdkRender();
+    setTimeout(()=>inp.focus(),30);
+  }else{
+    bg.classList.remove('show');
+  }
+}
+document.getElementById('cmdk-input').addEventListener('input',()=>{ uxCmdSel=0; uxCmdkRender(); });
+document.getElementById('cmdk-input').addEventListener('keydown',e=>{
+  const busca=uxNorm(e.target.value);
+  const filtrados=uxCmdItems.filter(i=>!busca||uxNorm(i.nome).includes(busca));
+  if(e.key==='ArrowDown'){ e.preventDefault(); uxCmdSel=Math.min(uxCmdSel+1,filtrados.length-1); uxCmdkRender(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); uxCmdSel=Math.max(uxCmdSel-1,0); uxCmdkRender(); }
+  else if(e.key==='Enter'){ const it=filtrados[uxCmdSel]; if(it){ uxCmdk(false); setTimeout(()=>it.run(),40); } }
+  else if(e.key==='Escape'){ uxCmdk(false); }
+});
+
+/* ---------- 6. ATALHOS GLOBAIS ---------- */
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); uxCmdk(true); return; }
+  if(e.key==='Escape'){
+    if(document.getElementById('cmdk-bg').classList.contains('show')) return uxCmdk(false);
+    const sb=document.querySelector('.sidebar');
+    if(sb && sb.classList.contains('open')) return uxSidebar(false);
+    document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show'));
+  }
+});
+
+/* ---------- 7. NAVEGAÇÃO POR TECLADO NAS TABELAS DE LANÇAMENTO ---------- */
+document.addEventListener('keydown', e=>{
+  const alvo=e.target;
+  if(!alvo || alvo.tagName!=='INPUT') return;
+  const tabela=alvo.closest('table'); if(!tabela) return;
+  const campos=[...tabela.querySelectorAll('input:not([type=checkbox]):not([disabled])')];
+  const i=campos.indexOf(alvo); if(i<0) return;
+  let destino=null;
+  if(e.key==='Enter'||e.key==='ArrowDown') destino=campos[i+1];
+  else if(e.key==='ArrowUp') destino=campos[i-1];
+  if(destino){ e.preventDefault(); destino.focus(); destino.select && destino.select(); }
+});
+document.addEventListener('focusin', e=>{
+  if(e.target.tagName!=='INPUT') return;
+  document.querySelectorAll('tr.row-focus').forEach(r=>r.classList.remove('row-focus'));
+  const tr=e.target.closest('tr'); if(tr && tr.closest('.lanc-table')) tr.classList.add('row-focus');
+});
+
+/* ---------- 8. FECHAR MENU E ANIMAR AO TROCAR DE PÁGINA ---------- */
+(function(){
+  const orig = window.showPage;
+  if(typeof orig!=='function') return;
+  window.showPage = function(id){
+    const r = orig.apply(this, arguments);
+    uxSidebar(false);
+    const c=document.getElementById('content');
+    if(c){ c.classList.remove('page-fade'); void c.offsetWidth; c.classList.add('page-fade'); }
+    return r;
+  };
+})();
+
+/* ---------- 9. AVISO DE ALTERAÇÕES NÃO SALVAS ---------- */
+(function(){
+  let pendente=false, t=null;
+  document.addEventListener('input', e=>{
+    if(e.target.closest && e.target.closest('.lanc-table')){
+      pendente=true; clearTimeout(t);
+      t=setTimeout(()=>{ pendente=false; }, 4000); // salvamento automático leva menos que isso
+    }
+  });
+  window.addEventListener('beforeunload', e=>{
+    if(pendente){ e.preventDefault(); e.returnValue=''; }
+  });
+})();
 </script>
 </body>
 </html>
