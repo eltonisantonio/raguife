@@ -2306,10 +2306,18 @@ function foRenderImport(){
     <input type="file" accept=".xlsx,.xls" style="display:none" onchange="foImportar('${tipo}',this)"></label>`;
   $('fo-step').innerHTML=`
     <div class="grid2">
-      ${upBox('fu-func','1. Funcionários (FoRelaFunc2)','Lista de funcionários, cargo, depto, escala.','func')}
-      ${upBox('fu-dias','2. Dias trabalhados (Verba 2)','Dias para o cálculo proporcional.','dias')}
+      ${upBox('fu-func','1. Funcionários (FoRelaFunc2)','Colunas necessárias: <b>Referência</b>, Chapa, Nome, Cargo, Depto., Escala. A <b>Referência é obrigatória</b> — é ela que casa os dias e o MIX.','func')}
+      ${upBox('fu-dias','2. Dias trabalhados (Verba 2)','Relação de Verbas do Domínio (verba 2). Deve conter <b>Referência</b>, Chapa e Quantidade (dias).','dias')}
     </div>
-    ${upBox('fu-faltas','3. Faltas (Verba 8)','Quem teve falta no período (zera o prêmio).','faltas')}
+    ${upBox('fu-faltas','3. Faltas (Verba 8)','Relação de Verbas do Domínio (verba 8). Deve conter <b>Referência</b>, Chapa e Quantidade. Quem tem falta no período zera o prêmio.','faltas')}
+    <div class="card">
+      <h3>4. Ocorrências (opcional)</h3>
+      <div class="card-sub">Atestados, advertências e suspensões por <b>Referência</b>. Baixe o modelo já preenchido com os funcionários, complete e reimporte. (Também é possível lançar manualmente na aba <b>Ocorrências</b>.)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn btn-ghost" onclick="foBaixarModeloOcorr()">⬇ Baixar modelo</button>
+        <label class="btn btn-ghost" style="cursor:pointer;margin:0">⬆ Importar preenchido<input type="file" accept=".xlsx,.xls" style="display:none" onchange="foImportarOcorr(this)"></label>
+      </div>
+    </div>
     <div id="fo-resumo" style="display:none">
       <div class="kpis" id="fo-resumo-stats"></div>
       <div id="fo-resumo-avisos"></div>
@@ -2350,9 +2358,9 @@ function foParseFunc(rows,fname){
     else if((h.startsWith('ESCALA')||h.startsWith('TURNO'))&&col.escala===undefined) col.escala=idx;
   });
   // defaults (compatível com layout antigo por posição), caso algum cabeçalho não seja encontrado
+  const temRef=col.ref!==undefined;   // Referência NÃO é assumida por posição — evita usar o cargo por engano
   if(col.chapa===undefined) col.chapa=0;
   if(col.nome===undefined) col.nome=1;
-  if(col.ref===undefined) col.ref=2;
   if(col.cargo===undefined) col.cargo=3;
   if(col.faixa===undefined) col.faixa=4;
   if(col.depto===undefined) col.depto=5;
@@ -2363,14 +2371,16 @@ function foParseFunc(rows,fname){
     if(!/^\d{4,}$/.test(chapa)) continue;
     const nome=String(r[col.nome]||'').trim(); if(!nome) continue;
     foFuncs.push({ chapa, nome,
-      ref:String(r[col.ref]||'').trim(),
+      ref:temRef?String(r[col.ref]||'').trim():'',
       cargo:String(r[col.cargo]||'').trim(),
       faixa:String(r[col.faixa]||'A').trim()||'A',
       depto:String(r[col.depto]||'').trim(),
       escala:String(r[col.escala]||'').trim() });
   }
   foMarcar('fu-func',fname+' — '+foFuncs.length+' funcionários');
-  foPersistir(); toast(foFuncs.length+' funcionários importados');
+  foPersistir();
+  if(!temRef) toast('⚠ Sem coluna "Referência" no arquivo — os Dias e Faltas não vão casar. Reexporte o FoRelaFunc2 com a Referência.','error');
+  else toast(foFuncs.length+' funcionários importados');
 }
 function foParseVerba(tipo,rows,fname){
   const dest={};
@@ -2384,6 +2394,59 @@ function foParseVerba(tipo,rows,fname){
   if(tipo==='dias'){ foDias=dest; foMarcar('fu-dias',fname+' — '+Object.keys(dest).length+' func.'); }
   else { foFaltas=dest; foMarcar('fu-faltas',fname+' — '+Object.keys(dest).length+' com faltas'); }
   foPersistir(); toast('Importado: '+Object.keys(dest).length+' registros');
+}
+/* ---------- Modelo de ocorrências do Prêmio Mensal ---------- */
+function foBaixarModeloOcorr(){
+  if(!foFuncs.length){ toast('Importe o FoRelaFunc2 primeiro','error'); return; }
+  const semRef=foFuncs.filter(f=>!String(f.ref).trim()).length;
+  if(semRef){ toast('⚠ '+semRef+' funcionário(s) sem Referência. Reexporte o FoRelaFunc2 com a Referência antes.','error'); return; }
+  const header=['Referência','Nome','Cargo','Atestados (dias)','Advertências (qtd)','Suspensão (dias)'];
+  const linhas=foFuncs.map(f=>{ const o=foGetOcorr(f.ref); return [f.ref,f.nome,f.cargo,o.atestados||'',o.adv||'',o.susp||'']; });
+  const ws=XLSX.utils.aoa_to_sheet([header,...linhas]);
+  ws['!cols']=[{wch:13},{wch:34},{wch:28},{wch:16},{wch:18},{wch:16}];
+  const instr=XLSX.utils.aoa_to_sheet([
+    ['COMO PREENCHER'],[],
+    ['1. Não altere as colunas Referência, Nome e Cargo (já preenchidas).'],
+    ['2. Dias trabalhados e Faltas NÃO vão aqui — vêm das Verbas 2 e 8.'],
+    ['3. Atestados (dias): descontam do proporcional.'],
+    ['4. Advertências (qtd): 0, 1 (paga 50%) ou 2+ (zera o prêmio).'],
+    ['5. Suspensão (dias): qualquer valor maior que 0 zera o prêmio.'],
+    ['6. Ao reimportar, estes dados substituem as ocorrências lançadas.']
+  ]);
+  instr['!cols']=[{wch:92}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Ocorrências');
+  XLSX.utils.book_append_sheet(wb,instr,'Instruções');
+  let sufixo=''; try{ sufixo='_'+String(varDB.periodo.mes).padStart(2,'0')+'-'+varDB.periodo.ano; }catch(e){}
+  XLSX.writeFile(wb,'Ocorrencias_Mensal'+sufixo+'.xlsx');
+  toast('Modelo gerado');
+}
+function foImportarOcorr(input){
+  const file=input.files[0]; if(!file) return;
+  if(!foFuncs.length){ toast('Importe o FoRelaFunc2 primeiro','error'); input.value=''; return; }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    let wb; try{ wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}); }
+    catch(err){ toast('Não foi possível ler o arquivo','error'); return; }
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+    const norm=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+    let hr=-1;
+    for(let i=0;i<Math.min(10,rows.length);i++){ if(rows[i].some(v=>norm(v)==='REFERENCIA')){ hr=i; break; } }
+    if(hr===-1) hr=0;
+    const refs=new Set(foFuncs.map(f=>String(f.ref).trim()));
+    let ap=0, ign=0;
+    for(let i=hr+1;i<rows.length;i++){
+      const r=rows[i]; const ref=String(r[0]||'').trim();
+      if(!ref) continue;
+      if(!refs.has(ref)){ ign++; continue; }
+      const atest=parseInt(r[3])||0, adv=parseInt(r[4])||0, susp=parseInt(r[5])||0;
+      if(atest===0&&adv===0&&susp===0){ delete foOcorr[ref]; ap++; continue; }
+      foOcorr[ref]={atestados:atest,adv,susp}; ap++;
+    }
+    foPersistir(); foRenderStep();
+    toast('Ocorrências importadas: '+ap+' funcionário(s)'+(ign?' · '+ign+' fora da lista':''));
+  };
+  reader.readAsArrayBuffer(file); input.value='';
 }
 function foRenderResumo(){
   if(foFuncs.length===0) return;
@@ -2832,19 +2895,20 @@ function pImportFunc(input){
     });
     if(col.chapa===undefined) col.chapa=0;
     if(col.nome===undefined) col.nome=1;
-    if(col.ref===undefined) col.ref=col.chapa;
+    const temRef=col.ref!==undefined;   // sem coluna Referência, NÃO usar a chapa no lugar
     const funcs=[];
     for(let i=header+1;i<rows.length;i++){
       const r=rows[i]; const chapa=String(r[col.chapa]||'').trim();
       if(!/^\d{4,}$/.test(chapa)) continue;
       const nome=String(r[col.nome]||'').trim(); if(!nome) continue;
-      funcs.push({ chapa, nome, ref:String(r[col.ref]||'').trim(),
+      funcs.push({ chapa, nome, ref:temRef?String(r[col.ref]||'').trim():'',
         funcao:col.funcao!==undefined?String(r[col.funcao]||'').trim():'',
         depto:col.depto!==undefined?String(r[col.depto]||'').trim():'',
         escala:col.escala!==undefined?String(r[col.escala]||'').trim():'' });
     }
     pComp().funcs=funcs; premSave(); pRenderImport();
-    toast(funcs.length+' funcionários importados');
+    if(!temRef) toast('⚠ Sem coluna "Referência" no arquivo — o MIX vai sair sem referência. Reexporte o FoRelaFunc2 com a Referência.','error');
+    else toast(funcs.length+' funcionários importados');
   };
   reader.readAsArrayBuffer(file); input.value='';
 }
