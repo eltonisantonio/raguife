@@ -4437,7 +4437,7 @@ function renderQIndicadores(){
       <td class="mono" style="color:var(--text3)">${vFmt(ind.m90,ind.formato)}</td>
       <td class="mono" style="color:var(--text3)">${vFmt(ind.m95,ind.formato)}</td>
       <td class="mono" style="font-weight:700">${vFmt(ind.m100,ind.formato)}</td>
-      <td style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="qAbrirModalInd(${ind.id})">Editar</button><button class="btn btn-danger btn-sm" onclick="qRemoverInd(${ind.id})">Remover</button></td>
+      <td style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="qAbrirModalInd(${ind.id})">Editar</button><button class="btn btn-ghost btn-sm" title="Copiar para outro cargo" onclick="qDuplicarInd(${ind.id})">Duplicar</button><button class="btn btn-danger btn-sm" onclick="qRemoverInd(${ind.id})">Remover</button></td>
     </tr>`).join('') : `<tr><td colspan="11" class="empty-state">Nenhum indicador encontrado</td></tr>`;
 }
 function qUpdateSetorSel(cur){
@@ -4501,6 +4501,18 @@ function qSalvarInd(){
   }
   qSave(); qFecharModalInd(); renderQIndicadores();
   toast(editId?'Indicador atualizado':'Indicador adicionado');
+}
+function qDuplicarInd(id){
+  if(!qCanEdit()) return;
+  const ind=qDB.indicadores.find(i=>i.id===id); if(!ind) return;
+  const novo=prompt(`Copiar "${ind.nome}" para qual cargo/função?\n(ex.: SUPERVISOR – TURNO B)`, ind.funcao||'');
+  if(novo===null) return;
+  const funcao=novo.trim().toUpperCase();
+  if(qDB.indicadores.some(i=>i.setor===ind.setor&&(i.turno||'')===(ind.turno||'')&&(i.funcao||'')===funcao&&i.nome===ind.nome&&i.periodicidade===ind.periodicidade)){ toast('Esse cargo já tem um indicador com esse nome','error'); return; }
+  const maxId=qDB.indicadores.reduce((m,i)=>Math.max(m,i.id),0);
+  const copia={...JSON.parse(JSON.stringify(ind)), id:maxId+1, funcao};
+  qDB.indicadores.push(copia); qSave(); renderQIndicadores();
+  toast('Indicador copiado — ajuste as metas'); qAbrirModalInd(copia.id);
 }
 function qRemoverInd(id){
   if(!qCanEdit()) return;
@@ -5090,12 +5102,14 @@ function qCalcPessoa(p, mod){
     const setores=p.setores||[];
     if(!setores.length) return {erro:'Sem setores'};
     const vals=setores.map(s=>{
-      const quem=qQuemCobre(s,mod);
+      const quem=qQuemCobre(s,mod).filter(q=>q.id!==p.id);
       if(quem.length){
-        const sub=quem[0]; const r=qResultadoProprios(sub,mod);
-        if(quem.length>1) alertas.push(`${s}: mais de um responsável (${quem.map(q=>q.nome).join(', ')}) — usado ${sub.nome}`);
-        detalhe.push({txt:`${s} → ${sub.nome}`, val:r.pts, sub:true});
-        return r.pts;
+        const vals=quem.map(q=>qResultadoProprios(q,mod).pts);
+        const m=vals.reduce((a,v)=>a+v,0)/vals.length;
+        const txt = quem.length===1 ? `${s} → ${quem[0].nome}`
+          : `${s} → média de ${quem.map((q,i)=>`${q.nome} (${qN(vals[i]*100,1)}%)`).join(' e ')}`;
+        detalhe.push({txt, val:m, sub:true});
+        return m;
       }
       const r=qResSetorCiclo(s,mod);
       if(r.faltando.length) alertas.push(`${s} sem resultado em ${r.faltando.join(', ')} (conta 0)`);
@@ -5215,7 +5229,7 @@ function renderQPessoas(){
         <thead><tr><th>Ref.</th><th>Nome</th><th>Cargo</th><th>Composição do resultado</th><th>Ciclo</th><th></th></tr></thead>
         <tbody id="q-pes-tbody"></tbody></table></div>
       <div class="note" style="font-size:12px;color:var(--text2);margin-top:12px">
-        <b>Substituição automática:</b> quando um setor de Coordenador/Gerente está no indicador automático de um Supervisor/Especialista ativo, entra o resultado dessa pessoa (sem faturamento) no lugar do setor.
+        <b>Substituição automática:</b> quando um setor de Coordenador/Gerente está no indicador automático de um Supervisor/Especialista ativo, entra o resultado dessa pessoa (sem faturamento) no lugar do setor. Se dois ou mais cobrem o mesmo setor, entra a média deles.
       </div>
     </div>
 
@@ -5256,7 +5270,7 @@ function qRenderPessoasTabela(){
         : '<span style="color:var(--red)">sem grupo</span>';
     } else {
       const per=p.periodicidade||'trimestral';
-      comp=(p.setores||[]).map(s=>{ const q=qQuemCobre(s,per); return q.length?`${escapeHtml(s)} <span style="color:var(--text3)">→ ${escapeHtml(q[0].nome)}</span>`:escapeHtml(s); }).join('<br>')||'<span style="color:var(--red)">sem setores</span>';
+      comp=(p.setores||[]).map(s=>{ const q=qQuemCobre(s,per); return q.length?`${escapeHtml(s)} <span style="color:var(--text3)">→ ${q.length>1?'média de ':''}${q.map(x=>escapeHtml(x.nome)).join(' e ')}</span>`:escapeHtml(s); }).join('<br>')||'<span style="color:var(--red)">sem setores</span>';
     }
     return `<tr style="${p.ativo===false?'opacity:.5':''}">
       <td class="mono">${escapeHtml(p.ref||'—')}</td>
