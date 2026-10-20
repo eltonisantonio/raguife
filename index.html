@@ -4320,7 +4320,9 @@ function renderPeriodico(){
           <label class="check" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--text1)"><input type="checkbox" id="qi-auto" onchange="qToggleAutoFields()"> <b>Indicador automático</b> — média dos setores do Prêmios Mensais</label>
           <div id="qi-auto-box" style="display:none;margin-top:10px">
             <div class="card-sub" style="margin-bottom:8px">O sistema puxa o resultado de cada setor marcado (com 5S/SST, sem faturamento), tira a média dos meses do ciclo e soma os pontos a mais. O valor é comparado com as metas abaixo. Ex.: média 80 + 10 pontos = 90.</div>
-            <div id="qi-auto-setores" class="checks" style="max-height:190px;overflow:auto;border:1px solid var(--border);padding:8px;background:var(--white)"></div>
+            <div id="qi-auto-marcados" style="font-size:12px;margin-bottom:8px"></div>
+            <input type="text" id="qi-auto-busca" placeholder="Buscar setor…" oninput="qFiltraAutoSetores()" style="width:100%;margin-bottom:6px">
+            <div id="qi-auto-setores" class="checks" style="max-height:300px;overflow:auto;border:1px solid var(--border);padding:8px;background:var(--white)"></div>
             <div class="field" style="max-width:200px;margin-top:10px"><label>Pontos a mais na média</label><input type="number" id="qi-auto-bonus" step="any" placeholder="0"></div>
           </div>
         </div>
@@ -4692,7 +4694,7 @@ function renderQLancTable(){
       media = av?av.valor:null;
       ating = av?vCalcAting(ind,av.valor):null;
       cols = meses.map((m,mi)=>`<td class="mono" style="color:var(--text2)" title="Média dos setores no mês">${av&&av.porMes[mi]!==null?qN(av.porMes[mi],1):'—'}</td>`).join('');
-      extra = av?`<div style="font-size:10.5px;color:var(--text3);margin-top:3px">Automático · média ${qN(av.media,1)}${ind.autoBonus?' + '+ind.autoBonus+' pts':''} · <a href="javascript:void(0)" onclick="qVerAuto(${ind.id})">ver setores</a></div>`:`<div style="font-size:10.5px;color:var(--red);margin-top:3px">Automático · nenhum resultado no Mensal neste ciclo para: ${(ind.autoSetores||[]).map(escapeHtml).join(', ')||'nenhum setor marcado'}</div>`;
+      extra = av?`<div style="font-size:10.5px;color:var(--text3);margin-top:3px">Automático · média ${qN(av.media,1)}${ind.autoBonus?' + '+ind.autoBonus+' pts':''} · <a href="javascript:void(0)" onclick="qVerAuto(${ind.id})">ver setores</a></div>`:`<div style="font-size:10.5px;color:var(--red);margin-top:3px">Automático · nenhum resultado no Mensal neste ciclo para: ${(ind.autoSetores||[]).map(escapeHtml).join(', ')||'nenhum setor marcado'} · <a href="javascript:void(0)" onclick="qVerAuto(${ind.id})">ver motivo</a></div>`;
     } else {
       const resPorMes=meses.map(m=>qResInd(ind,m.pkey,qSetor,qTurno,qFuncao));
       const comValor=resPorMes.filter(v=>v!==null);
@@ -4914,6 +4916,17 @@ function qResSetorMes(setor, pkey){
   qMemo[k] = n ? soma/n : null;
   return qMemo[k];
 }
+/* por que um setor não tem resultado num mês */
+function qDiagSetorMes(setor, pkey){
+  if(!varDB) return 'Mensal não carregado';
+  const mods=['adm','industria'].filter(m=>(varDB.setores[m]||[]).includes(setor));
+  if(!mods.length) return 'setor não existe no Mensal';
+  const temInd=mods.some(m=>varDB.indicadores.some(i=>i.setor===setor&&i.modulo===m&&i.periodicidade==='mensal'));
+  if(!temInd) return 'setor sem indicadores mensais';
+  const res=varDB.resultados[pkey]||{};
+  const temLanc=Object.keys(res).some(k=>{ const [m,s2]=k.split('||'); return mods.includes(m)&&s2===setor&&Object.keys(res[k]||{}).length; });
+  return temLanc?'lançamentos não batem com os indicadores atuais':'sem lançamento no mês';
+}
 /* resultado do setor no ciclo: média dos meses (mês sem dado = 0) */
 function qResSetorCiclo(setor, mod){
   const meses=qMesesCiclo(mod,qDB.periodo.mes,qDB.periodo.ano);
@@ -4958,11 +4971,13 @@ function qIndAting(ind, rKey, meses, mod){
 }
 function qVerAuto(id){
   const ind=qDB.indicadores.find(i=>i.id===id); if(!ind) return;
-  qMemoReset(); const av=qAutoValor(ind,qMod);
-  if(!av){ toast('Sem dados do Prêmios Mensais para os setores deste indicador','error'); return; }
+  qMemoReset();
   const meses=qMesesCiclo(qMod,qDB.periodo.mes,qDB.periodo.ano);
-  const pct=v=>v===null||v===undefined?'<span style="color:var(--red)" title="Sem lançamento no Mensal — conta 0">0,0% *</span>':qN(v*100,1)+'%';
-  const linhas=av.itens.map(x=>`<tr><td style="font-weight:600">${escapeHtml(x.setor)}</td>${x.porMes.map(v=>`<td class="mono">${pct(v)}</td>`).join('')}<td class="mono" style="font-weight:800">${qN(x.val*100,1)}%</td></tr>`).join('');
+  const av=qAutoValor(ind,qMod) || {media:0, valor:(+ind.autoBonus||0), porMes:meses.map(()=>null),
+    itens:(ind.autoSetores||[]).map(st=>({setor:st, ...qResSetorCiclo(st,qMod)}))};
+  const pct=(v,st,pk)=>v===null||v===undefined?`<span style="color:var(--red)" title="${escapeHtml(qDiagSetorMes(st,pk))} — conta 0">0,0% *<div style="font-size:10px;font-weight:500">${escapeHtml(qDiagSetorMes(st,pk))}</div></span>`:qN(v*100,1)+'%';
+  const linhas=av.itens.map(x=>`<tr><td style="font-weight:600">${escapeHtml(x.setor)}</td>${x.porMes.map((v,mi)=>`<td class="mono">${pct(v,x.setor,meses[mi].pkey)}</td>`).join('')}<td class="mono" style="font-weight:800">${qN(x.val*100,1)}%</td></tr>`).join('')
+    || `<tr><td colspan="${meses.length+2}" class="empty-state">Nenhum setor marcado neste indicador.</td></tr>`;
   const rodMes=av.porMes.map(v=>`<td class="mono" style="font-weight:700">${v===null?'—':qN(v,1)+'%'}</td>`).join('');
   // faixa atingida
   const faixas=[['m100',1],['m95',0.95],['m90',0.90],['m85',0.85]].filter(([k])=>ind[k]!==null&&ind[k]!==undefined);
@@ -4977,7 +4992,7 @@ function qVerAuto(id){
     <div class="tbl-wrap"><table>
       <thead><tr><th>Setor</th>${meses.map(m=>`<th>${vNomeMes(m.mes)}/${String(m.ano).slice(2)}</th>`).join('')}<th>Média</th></tr></thead>
       <tbody>${linhas}</tbody>
-      <tfoot><tr style="background:var(--hover)"><td style="font-weight:700">Média dos setores</td>${rodMes}<td class="mono" style="font-weight:800">${qN(av.media,1)}%</td></tr></tfoot>
+      <tfoot><tr style="background:var(--hover)"><td style="font-weight:700">Média dos setores (${av.itens.length})</td>${rodMes}<td class="mono" style="font-weight:800">${qN(av.media,1)}%</td></tr></tfoot>
     </table></div>
     ${faltou?'<div style="font-size:11.5px;color:var(--red);margin-top:6px">* mês sem lançamento no Mensal — conta como 0 na média do setor.</div>':''}
     <div style="margin-top:16px;border:1px solid var(--border);border-left:4px solid var(--lima);padding:12px 16px;font-size:13px;line-height:1.9">
@@ -4988,7 +5003,7 @@ function qVerAuto(id){
       <div style="display:flex;justify-content:space-between"><span>Faixa atingida</span><b>${faixaTxt}</b></div>
       <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:4px;font-size:14px"><span>Pontos no resultado (${qN(frac*100,0)}% × peso ${qN(ind.peso*100,0)}%)</span><b class="mono" style="color:${ating>0?'var(--green)':'var(--red)'}">${qN(ating*100,1)} pts</b></div>
     </div>
-    <div class="modal-actions"><button class="btn btn-primary" onclick="document.getElementById('q-modal-auto').classList.remove('show')">Fechar</button></div>
+    <div class="modal-actions">${qCanEdit()?`<button class="btn btn-ghost" onclick="document.getElementById('q-modal-auto').classList.remove('show');qAbrirModalInd(${ind.id})">Alterar setores</button>`:''}<button class="btn btn-primary" onclick="document.getElementById('q-modal-auto').classList.remove('show')">Fechar</button></div>
   </div>`;
   bg.classList.add('show');
 }
@@ -5000,6 +5015,21 @@ function qMontaAutoSetores(sel){
     return `<div style="width:100%;font-size:11px;font-weight:700;color:var(--text2);margin:4px 0">${tit}</div>`+
       l.map(x=>`<label class="check"><input type="checkbox" class="qi-auto-chk" value="${escapeHtml(x.nome)}" ${sel.includes(x.nome)?'checked':''}> ${escapeHtml(x.nome)}</label>`).join(''); };
   box.innerHTML=grupo('adm','Administrativo')+grupo('industria','Operação');
+  const b=$('qi-auto-busca'); if(b) b.value='';
+  box.querySelectorAll('.qi-auto-chk').forEach(c=>c.addEventListener('change',qResumoAutoSetores));
+  qResumoAutoSetores();
+}
+function qResumoAutoSetores(){
+  const el=$('qi-auto-marcados'); if(!el) return;
+  const sel=[...document.querySelectorAll('.qi-auto-chk:checked')].map(c=>c.value);
+  el.innerHTML = sel.length ? `<b>Marcados (${sel.length}):</b> ${sel.map(x=>`<span class="badge badge-green" style="margin:2px">${escapeHtml(x)}</span>`).join('')}` : '<span style="color:var(--red)">Nenhum setor marcado</span>';
+}
+function qFiltraAutoSetores(){
+  const t=($('qi-auto-busca').value||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  document.querySelectorAll('#qi-auto-setores label.check').forEach(l=>{
+    const n=l.textContent.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    l.style.display = !t||n.includes(t) ? '' : 'none';
+  });
 }
 function qToggleAutoFields(){ const b=$('qi-auto-box'); if(b) b.style.display=$('qi-auto').checked?'block':'none'; }
 
