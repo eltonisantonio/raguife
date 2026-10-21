@@ -4319,11 +4319,11 @@ function renderPeriodico(){
         <div class="field" style="border:1px solid var(--border);border-left:4px solid var(--lima);padding:12px 14px;background:var(--hover)">
           <label class="check" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--text1)"><input type="checkbox" id="qi-auto" onchange="qToggleAutoFields()"> <b>Indicador automático</b> — média dos setores do Prêmios Mensais</label>
           <div id="qi-auto-box" style="display:none;margin-top:10px">
-            <div class="card-sub" style="margin-bottom:8px">O sistema puxa o resultado de cada setor marcado (com 5S/SST, sem faturamento), tira a média dos meses do ciclo e soma os pontos a mais. O valor é comparado com as metas abaixo. Ex.: média 80 + 10 pontos = 90.</div>
+            <div class="card-sub" style="margin-bottom:8px">O sistema puxa o resultado de cada setor marcado (com 5S/SST, sem faturamento), tira a média dos meses do ciclo e divide pelo teto do setor (soma dos pesos no Mensal, normalmente 90). A média desses percentuais é comparada com as metas abaixo. Ex.: Higienização média 86,5 ÷ 90 = 96,1%.</div>
             <div id="qi-auto-marcados" style="font-size:12px;margin-bottom:8px"></div>
             <input type="text" id="qi-auto-busca" placeholder="Buscar setor…" oninput="qFiltraAutoSetores()" style="width:100%;margin-bottom:6px">
             <div id="qi-auto-setores" class="checks" style="max-height:300px;overflow:auto;border:1px solid var(--border);padding:8px;background:var(--white)"></div>
-            <div class="field" style="max-width:200px;margin-top:10px"><label>Pontos a mais na média</label><input type="number" id="qi-auto-bonus" step="any" placeholder="0"></div>
+            <input type="hidden" id="qi-auto-bonus">
           </div>
         </div>
         <div class="row">
@@ -4429,7 +4429,7 @@ function renderQIndicadores(){
     <tr>
       <td style="font-size:12px">${ind.setor}</td>
       <td>${vPeriodTag(ind.periodicidade)}</td>
-      <td style="font-weight:500;max-width:220px">${ind.nome}${ind.auto?`<div style="margin-top:3px"><span class="badge badge-blue" title="${(ind.autoSetores||[]).join(', ')}">Automático · ${(ind.autoSetores||[]).length} setor(es)${ind.autoBonus?' +'+ind.autoBonus+' pts':''}</span></div>`:''}${ind.turno?`<div style="font-size:10px;color:var(--text3)">${ind.turno}</div>`:''}${ind.funcao?`<div style="font-size:10px;color:var(--text3)">Cargo: ${ind.funcao}</div>`:''}</td>
+      <td style="font-weight:500;max-width:220px">${ind.nome}${ind.auto?`<div style="margin-top:3px"><span class="badge badge-blue" title="${(ind.autoSetores||[]).join(', ')}">Automático · ${(ind.autoSetores||[]).length} setor(es)</span></div>`:''}${ind.turno?`<div style="font-size:10px;color:var(--text3)">${ind.turno}</div>`:''}${ind.funcao?`<div style="font-size:10px;color:var(--text3)">Cargo: ${ind.funcao}</div>`:''}</td>
       <td><span class="badge ${ind.sentido==='maior'?'badge-green':'badge-amber'}">${ind.sentido==='maior'?'↑':'↓'}</span></td>
       <td><span class="badge badge-gray" style="font-size:10px">${ind.formato||'dec'}</span></td>
       <td class="mono">${(ind.peso*100).toFixed(0)}%</td>
@@ -4488,7 +4488,7 @@ function qSalvarInd(){
     m95: parseNum($('qi-m95').value), m100: parseNum($('qi-m100').value),
     auto: $('qi-auto').checked,
     autoSetores: $('qi-auto').checked ? [...document.querySelectorAll('.qi-auto-chk:checked')].map(c=>c.value) : [],
-    autoBonus: $('qi-auto').checked ? (parseNum($('qi-auto-bonus').value)||0) : 0
+    autoBonus: 0
   };
   if(dados.auto && !dados.autoSetores.length){ toast('Marque ao menos um setor para a média','error'); return; }
   const editId=$('qi-id').value;
@@ -4551,7 +4551,7 @@ function renderQLancamento(){
 
     ${currentUser.admin?`<div class="card" id="q-fat-card">
       <h3>Faturamento</h3>
-      <div class="card-sub">Somente administradores. Informe o % de atingimento da meta de faturamento em cada mês do ciclo. A média dos meses cai num degrau (85/90/95/100%), que vale 20% do prêmio (25% para Gerente).</div>
+      <div class="card-sub">Somente administradores. Informe o % de atingimento da meta de faturamento em cada mês do ciclo. A média dos meses cai num degrau (faixas ${(qDB.fatFaixas||[]).join(' / ')}%; abaixo da primeira = 0), que vale 20% do prêmio (25% para Gerente).</div>
       <div id="q-fat-tabela"></div>
     </div>`:''}
 
@@ -4706,7 +4706,7 @@ function renderQLancTable(){
       media = av?av.valor:null;
       ating = av?vCalcAting(ind,av.valor):null;
       cols = meses.map((m,mi)=>`<td class="mono" style="color:var(--text2)" title="Média dos setores no mês">${av&&av.porMes[mi]!==null?qN(av.porMes[mi],1):'—'}</td>`).join('');
-      extra = av?`<div style="font-size:10.5px;color:var(--text3);margin-top:3px">Automático · média ${qN(av.media,1)}${ind.autoBonus?' + '+ind.autoBonus+' pts':''} · <a href="javascript:void(0)" onclick="qVerAuto(${ind.id})">ver setores</a></div>`:`<div style="font-size:10.5px;color:var(--red);margin-top:3px">Automático · nenhum resultado no Mensal neste ciclo para: ${(ind.autoSetores||[]).map(escapeHtml).join(', ')||'nenhum setor marcado'} · <a href="javascript:void(0)" onclick="qVerAuto(${ind.id})">ver motivo</a></div>`;
+      extra = av?`<div style="font-size:10.5px;color:var(--text3);margin-top:3px">Automático · média proporcional dos setores ${qN(av.media,2)}% · <a href="javascript:void(0)" onclick="qVerAuto(${ind.id})">ver setores</a></div>`:`<div style="font-size:10.5px;color:var(--red);margin-top:3px">Automático · nenhum resultado no Mensal neste ciclo para: ${(ind.autoSetores||[]).map(escapeHtml).join(', ')||'nenhum setor marcado'} · <a href="javascript:void(0)" onclick="qVerAuto(${ind.id})">ver motivo</a></div>`;
     } else {
       const resPorMes=meses.map(m=>qResInd(ind,m.pkey,qSetor,qTurno,qFuncao));
       const comValor=resPorMes.filter(v=>v!==null);
@@ -4909,25 +4909,35 @@ function qCombosMensal(setor, mod){
   return out;
 }
 /* resultado de um setor do Mensal num mês (fração 0..~0,9) ou null se não lançado */
-function qResSetorMes(setor, pkey){
+/* teto do setor no Mensal = soma dos pesos dos indicadores (normalmente 0,90) */
+function qTetoCombo(setor, turno, funcao, mod){
+  const inds=varDB.indicadores.filter(i=>i.setor===setor && i.modulo===mod && i.periodicidade==='mensal');
+  let base;
+  if(turno){ const b=[...inds.filter(i=>i.turno===turno), ...inds.filter(i=>!i.turno)]; base=funcao?b.filter(i=>i.funcao===funcao||!i.funcao):b; }
+  else base=funcao?inds.filter(i=>i.funcao===funcao):inds;
+  return base.reduce((a,i)=>a+(+i.peso||0),0);
+}
+/* resultado do setor no mês, sem faturamento e com 5S/SST: {raw, teto} ou null */
+function qResSetorMesInfo(setor, pkey){
   const k='m|'+setor+'|'+pkey; if(k in qMemo) return qMemo[k];
   if(!varDB){ qMemo[k]=null; return null; }
   const [ano,mes]=pkey.split('-').map(Number);
   const orig=varDB.periodo; varDB.periodo={mes,ano};
-  let soma=0,n=0;
+  let soma=0, somaTeto=0, n=0;
   try{
     ['adm','industria'].forEach(mod=>{
       if(!(varDB.setores[mod]||[]).includes(setor)) return;
       qCombosMensal(setor,mod).forEach(c=>{
         const bruto=vCalcBrutoSetor(setor,c.turno,c.funcao,mod);
         if(bruto===null) return;
-        soma+=Math.max(0, bruto+vPen5S(setor)+vPenSST(setor)); n++;
+        soma+=Math.max(0, bruto+vPen5S(setor)+vPenSST(setor)); somaTeto+=qTetoCombo(setor,c.turno,c.funcao,mod); n++;
       });
     });
   } finally { varDB.periodo=orig; }
-  qMemo[k] = n ? soma/n : null;
+  qMemo[k] = n ? {raw:soma/n, teto:somaTeto/n} : null;
   return qMemo[k];
 }
+function qResSetorMes(setor, pkey){ const r=qResSetorMesInfo(setor,pkey); return r?r.raw:null; }
 /* por que um setor não tem resultado num mês */
 function qDiagSetorMes(setor, pkey){
   if(!varDB) return 'Mensal não carregado';
@@ -4940,12 +4950,18 @@ function qDiagSetorMes(setor, pkey){
   return temLanc?'lançamentos não batem com os indicadores atuais':'sem lançamento no mês';
 }
 /* resultado do setor no ciclo: média dos meses (mês sem dado = 0) */
+/* Regra validada com o RH: média do trimestre (mês sem dado = 0) ÷ teto do setor.
+   Ex.: Higienização 85 / 87,5 / 87 → média 86,5 ÷ 90 = 96,11%. */
 function qResSetorCiclo(setor, mod){
   const meses=qMesesCiclo(mod,qDB.periodo.mes,qDB.periodo.ano);
-  const porMes=meses.map(m=>qResSetorMes(setor,m.pkey));
+  const infos=meses.map(m=>qResSetorMesInfo(setor,m.pkey));
+  const porMes=infos.map(x=>x?x.raw:null);
   const faltando=meses.filter((m,i)=>porMes[i]===null).map(m=>vNomeMes(m.mes));
-  const val=porMes.reduce((s,v)=>s+(v||0),0)/meses.length;
-  return {val, porMes, faltando, semNada: porMes.every(v=>v===null)};
+  const rawMedia=porMes.reduce((s,v)=>s+(v||0),0)/meses.length;
+  const tetos=infos.filter(Boolean).map(x=>x.teto);
+  const teto=tetos.length? tetos.reduce((a,t)=>a+t,0)/tetos.length : 0;
+  const val=teto>0 ? rawMedia/teto : 0;
+  return {val, rawMedia, teto, porMes, faltando, semNada: porMes.every(v=>v===null)};
 }
 
 /* ---------- indicador automático ---------- */
@@ -4955,11 +4971,14 @@ function qAutoValor(ind, mod){
   const itens=setores.map(s=>({setor:s, ...qResSetorCiclo(s,mod)}));
   if(itens.every(x=>x.semNada)) return null;
   const media=itens.reduce((a,x)=>a+x.val,0)/itens.length*100;
+  // por mês: média dos setores no mês, já proporcional (só para exibição)
   const porMes=meses.map((m,mi)=>{
-    const vs=itens.map(x=>x.porMes[mi]); if(vs.every(v=>v===null)) return null;
+    const vs=itens.map(x=>{ const r=x.porMes[mi]; return r===null?null:(x.teto>0?r/x.teto:0); });
+    if(vs.every(v=>v===null)) return null;
     return vs.reduce((a,v)=>a+(v||0),0)/vs.length*100;
   });
-  return {media, valor: media+(+ind.autoBonus||0), porMes, itens};
+  // os antigos "+10 pontos" foram substituídos pela regra proporcional (÷ teto)
+  return {media, valor: media, porMes, itens};
 }
 /* Onde fica o lançamento de um indicador.
    Antes, o valor ia para a chave da ABA aberta (Todos ou SUPERVISOR), e o
@@ -4985,35 +5004,38 @@ function qVerAuto(id){
   const ind=qDB.indicadores.find(i=>i.id===id); if(!ind) return;
   qMemoReset();
   const meses=qMesesCiclo(qMod,qDB.periodo.mes,qDB.periodo.ano);
-  const av=qAutoValor(ind,qMod) || {media:0, valor:(+ind.autoBonus||0), porMes:meses.map(()=>null),
+  const av=qAutoValor(ind,qMod) || {media:0, valor:0, porMes:meses.map(()=>null),
     itens:(ind.autoSetores||[]).map(st=>({setor:st, ...qResSetorCiclo(st,qMod)}))};
-  const pct=(v,st,pk)=>v===null||v===undefined?`<span style="color:var(--red)" title="${escapeHtml(qDiagSetorMes(st,pk))} — conta 0">0,0% *<div style="font-size:10px;font-weight:500">${escapeHtml(qDiagSetorMes(st,pk))}</div></span>`:qN(v*100,1)+'%';
-  const linhas=av.itens.map(x=>`<tr><td style="font-weight:600">${escapeHtml(x.setor)}</td>${x.porMes.map((v,mi)=>`<td class="mono">${pct(v,x.setor,meses[mi].pkey)}</td>`).join('')}<td class="mono" style="font-weight:800">${qN(x.val*100,1)}%</td></tr>`).join('')
-    || `<tr><td colspan="${meses.length+2}" class="empty-state">Nenhum setor marcado neste indicador.</td></tr>`;
-  const rodMes=av.porMes.map(v=>`<td class="mono" style="font-weight:700">${v===null?'—':qN(v,1)+'%'}</td>`).join('');
-  // faixa atingida
+  const cel=(v,st,pk)=>v===null||v===undefined
+    ? `<span style="color:var(--red)" title="${escapeHtml(qDiagSetorMes(st,pk))} — conta 0">0 *<div style="font-size:10px;font-weight:500">${escapeHtml(qDiagSetorMes(st,pk))}</div></span>`
+    : qN(v*100,2);
+  const linhas=av.itens.map(x=>`<tr><td style="font-weight:600">${escapeHtml(x.setor)}</td>
+      ${x.porMes.map((v,mi)=>`<td class="mono">${cel(v,x.setor,meses[mi].pkey)}</td>`).join('')}
+      <td class="mono">${qN(x.rawMedia*100,2)}</td>
+      <td class="mono" style="color:var(--text2)">÷ ${qN(x.teto*100,0)}</td>
+      <td class="mono" style="font-weight:800">${qN(x.val*100,2)}%</td></tr>`).join('')
+    || `<tr><td colspan="${meses.length+4}" class="empty-state">Nenhum setor marcado neste indicador.</td></tr>`;
   const faixas=[['m100',1],['m95',0.95],['m90',0.90],['m85',0.85]].filter(([k])=>ind[k]!==null&&ind[k]!==undefined);
   const ating=vCalcAting(ind,av.valor); const frac=ind.peso?ating/ind.peso:0;
-  const faixaTxt = frac>0 ? `${qN(frac*100,0)}% (valor ${ind.sentido==='maior'?'≥':'≤'} ${vFmt(ind[faixas.find(f=>Math.abs(f[1]-frac)<1e-9)?.[0]],ind.formato)})` : 'nenhuma faixa atingida (0%)';
+  const fk=faixas.find(f=>Math.abs(f[1]-frac)<1e-9);
+  const faixaTxt = frac>0 ? `${qN(frac*100,0)}% (${qN(av.valor,2)} ${ind.sentido==='maior'?'≥':'≤'} ${vFmt(ind[fk?.[0]],ind.formato)})` : 'nenhuma faixa atingida (0%)';
   const faltou=av.itens.some(x=>x.porMes.some(v=>v===null));
+  const conta=av.itens.length ? `(${av.itens.map(x=>qN(x.val*100,2)).join(' + ')}) ÷ ${av.itens.length}` : '—';
   let bg=document.getElementById('q-modal-auto');
   if(!bg){ bg=document.createElement('div'); bg.id='q-modal-auto'; bg.className='modal-bg'; bg.onclick=e=>{ if(e.target===bg) bg.classList.remove('show'); }; document.body.appendChild(bg); }
-  bg.innerHTML=`<div class="modal modal-lg">
+  bg.innerHTML=`<div class="modal modal-lg" style="max-width:820px">
     <h3>${escapeHtml(ind.nome)}</h3>
     <div class="card-sub" style="margin-bottom:12px">${escapeHtml(ind.setor)}${ind.funcao?' / '+escapeHtml(ind.funcao):''} · resultado de cada setor no Prêmios Mensais (com 5S/SST, sem faturamento)</div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Setor</th>${meses.map(m=>`<th>${vNomeMes(m.mes)}/${String(m.ano).slice(2)}</th>`).join('')}<th>Média</th></tr></thead>
+      <thead><tr><th>Setor</th>${meses.map(m=>`<th>${vNomeMes(m.mes)}/${String(m.ano).slice(2)}</th>`).join('')}<th>Média</th><th>Teto</th><th>Proporcional</th></tr></thead>
       <tbody>${linhas}</tbody>
-      <tfoot><tr style="background:var(--hover)"><td style="font-weight:700">Média dos setores (${av.itens.length})</td>${rodMes}<td class="mono" style="font-weight:800">${qN(av.media,1)}%</td></tr></tfoot>
     </table></div>
     ${faltou?'<div style="font-size:11.5px;color:var(--red);margin-top:6px">* mês sem lançamento no Mensal — conta como 0 na média do setor.</div>':''}
     <div style="margin-top:16px;border:1px solid var(--border);border-left:4px solid var(--lima);padding:12px 16px;font-size:13px;line-height:1.9">
-      <div style="display:flex;justify-content:space-between"><span>Média dos setores no trimestre</span><b class="mono">${qN(av.media,1)}</b></div>
-      ${ind.autoBonus?`<div style="display:flex;justify-content:space-between"><span>+ Pontos a mais</span><b class="mono">+ ${qN(ind.autoBonus,1)}</b></div>`:''}
-      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:4px"><span>Valor comparado com as metas</span><b class="mono">${qN(av.valor,1)}</b></div>
-      <div style="display:flex;justify-content:space-between"><span>Metas (85 / 90 / 95 / 100%)</span><span class="mono">${['m85','m90','m95','m100'].map(k=>vFmt(ind[k],ind.formato)).join(' / ')}</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Faixa atingida</span><b>${faixaTxt}</b></div>
-      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:4px;font-size:14px"><span>Pontos no resultado (${qN(frac*100,0)}% × peso ${qN(ind.peso*100,0)}%)</span><b class="mono" style="color:${ating>0?'var(--green)':'var(--red)'}">${qN(ating*100,1)} pts</b></div>
+      <div style="display:flex;justify-content:space-between;gap:12px"><span>1 · Média proporcional dos setores <span style="color:var(--text3)">${conta}</span></span><b class="mono">${qN(av.media,2)}%</b></div>
+      <div style="display:flex;justify-content:space-between"><span>2 · Metas (85 / 90 / 95 / 100%)</span><span class="mono">${['m85','m90','m95','m100'].map(k=>vFmt(ind[k],ind.formato)).join(' / ')}</span></div>
+      <div style="display:flex;justify-content:space-between"><span>3 · Faixa atingida</span><b>${faixaTxt}</b></div>
+      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:4px;font-size:14px"><span>4 · Pontos (${qN(frac*100,0)}% × peso ${qN(ind.peso*100,0)}%)</span><b class="mono" style="color:${ating>0?'var(--green)':'var(--red)'}">${qN(ating*100,2)} pts</b></div>
     </div>
     <div class="modal-actions">${qCanEdit()?`<button class="btn btn-ghost" onclick="document.getElementById('q-modal-auto').classList.remove('show');qAbrirModalInd(${ind.id})">Alterar setores</button>`:''}<button class="btn btn-primary" onclick="document.getElementById('q-modal-auto').classList.remove('show')">Fechar</button></div>
   </div>`;
@@ -5074,24 +5096,74 @@ function qResultadoProprios(p, mod){
   const g=qGrupoDe(p); const meses=qMesesCiclo(mod,qDB.periodo.mes,qDB.periodo.ano);
   const rKey=`${g.setor}||${g.turno}${g.funcao?'||'+g.funcao:''}`;
   const inds=qIndsGrupo(g,mod);
+  const [st,tu,fu]=String(rKey).split('||');
   const itens=inds.map(ind=>{
     const a=qIndAting(ind,rKey,meses,mod);
     const av=ind.auto?qAutoValor(ind,mod):null;
-    return {ind, ating:a, auto:av};
+    let valores=null, media=null;
+    if(av){ media=av.valor; }
+    else { valores=meses.map(m=>qResInd(ind,m.pkey,st,tu,fu)); if(valores.some(v=>v!==null)) media=valores.reduce((x,v)=>x+(v||0),0)/meses.length; }
+    return {ind, ating:a, auto:av, valores, media};
   });
   const r={pts: itens.reduce((s,x)=>s+(x.ating||0),0), pesoTotal: inds.reduce((s,i)=>s+(+i.peso||0),0), itens,
     pendentes: itens.filter(x=>x.ating===null).map(x=>x.ind.nome)};
   qMemo[k]=r; return r;
 }
 /* supervisor/especialista que cobre um setor do Mensal (pelo indicador automático) */
-function qQuemCobre(setor, mod){
-  return qPessoasAtivas(mod).filter(p=>{
-    const c=qCargo(p.cargo); if(!c||!p.grupo) return false;
-    if(c.tipo==='proprios')
-      return qIndsGrupo(qGrupoDe(p),mod).some(i=>i.auto && (i.autoSetores||[]).includes(setor));
-    // Coordenador/Gerente com indicadores próprios: cobre o setor do próprio grupo
-    return p.modo==='proprios' && qGrupoDe(p).setor===setor;
+/* ---------- hierarquia (cascata) ----------
+   Supervisor/Especialista (1) → Coordenador (2) → Gerente (3).
+   Para um setor da lista de alguém, entra o resultado de quem cobre esse setor
+   no nível imediatamente abaixo (se houver mais de um, a média deles). Sem
+   ninguém cobrindo, entra o resultado do setor no Mensal.
+   O resultado que "sobe" é o percentual do teto da pessoa, sem faturamento:
+   78 pts de 80 possíveis sobem como 97,5%. */
+const Q_RANK={supervisor:1, especialista:1, coordenador:2, gerente:3};
+function qRank(p){ return Q_RANK[p.cargo]||0; }
+function qCobre(q, setor, mod){
+  const c=qCargo(q.cargo); if(!c) return false;
+  if(c.tipo==='proprios') return !!q.grupo && qIndsGrupo(qGrupoDe(q),mod).some(i=>i.auto && (i.autoSetores||[]).includes(setor));
+  if(q.modo==='proprios') return !!q.grupo && qGrupoDe(q).setor===setor;
+  return (q.setores||[]).includes(setor);
+}
+function qCobertores(setor, rankAcima, mod){
+  const cand=qPessoasAtivas(mod).filter(q=>qRank(q)>0 && qRank(q)<rankAcima && qCobre(q,setor,mod));
+  if(!cand.length) return [];
+  const top=Math.max(...cand.map(qRank));
+  return cand.filter(q=>qRank(q)===top);
+}
+/* compatibilidade: quem cobre o setor para alguém do topo */
+function qQuemCobre(setor, mod){ return qCobertores(setor, 99, mod); }
+/* resultado de uma pessoa sem faturamento, como % do próprio teto (0..1) */
+function qNormPessoa(q, mod){
+  const k='n|'+q.id+'|'+mod; if(k in qMemo) return qMemo[k];
+  qMemo[k]=0; // trava contra ciclos
+  let v=0;
+  if(qUsaProprios(q)){ const r=qResultadoProprios(q,mod); v = r.pesoTotal>0 ? r.pts/r.pesoTotal : 0; }
+  else { v = qMediaSetores(q,mod).media; }
+  qMemo[k]=v; return v;
+}
+/* média dos setores de um Coordenador/Gerente (cada item já na escala 0..1) */
+function qMediaSetores(p, mod){
+  const k='ms|'+p.id+'|'+mod; if(k in qMemo) return qMemo[k];
+  const detalhe=[], alertas=[];
+  const vals=(p.setores||[]).map(s=>{
+    const quem=qCobertores(s, qRank(p), mod).filter(q=>q.id!==p.id);
+    if(quem.length){
+      const vs=quem.map(q=>qNormPessoa(q,mod));
+      const m=vs.reduce((a,v)=>a+v,0)/vs.length;
+      const esc=q=>{ if(!qUsaProprios(q)) return ''; const r=qResultadoProprios(q,mod); return ` (${qN(r.pts*100,1)} de ${qN(r.pesoTotal*100,0)} pts)`; };
+      const txt = quem.length===1 ? `${s} → ${quem[0].nome}${esc(quem[0])}`
+        : `${s} → média de ${quem.map((q,i)=>`${q.nome}${esc(q)} = ${qN(vs[i]*100,1)}%`).join(' e ')}`;
+      detalhe.push({txt, como: quem.length===1?'resultado da pessoa sem faturamento ÷ teto dela':'média dos responsáveis, cada um sem faturamento ÷ teto', val:m, sub:true});
+      return m;
+    }
+    const r=qResSetorCiclo(s,mod);
+    if(r.faltando.length) alertas.push(`${s} sem resultado em ${r.faltando.join(', ')} (conta 0)`);
+    detalhe.push({txt:s, como:`Mensal: ${r.porMes.map(v=>v===null?'0*':qN(v*100,2)).join(' / ')} → média ${qN(r.rawMedia*100,2)} ÷ ${qN(r.teto*100,0)}`, val:r.val});
+    return r.val;
   });
+  const media=vals.length? vals.reduce((a,v)=>a+v,0)/vals.length : 0;
+  qMemo[k]={media, detalhe, alertas}; return qMemo[k];
 }
 function qCalcPessoa(p, mod){
   const c=qCargo(p.cargo); if(!c) return {erro:'Cargo não cadastrado'};
@@ -5100,32 +5172,23 @@ function qCalcPessoa(p, mod){
     if(!p.grupo) return {erro:'Sem grupo de indicadores'};
     const r=qResultadoProprios(p,mod);
     indPts=r.pts;
-    r.itens.forEach(x=>detalhe.push({txt:x.ind.nome+(x.auto?` (média ${qN(x.auto.media,1)}${x.ind.autoBonus?' +'+x.ind.autoBonus:''} = ${qN(x.auto.valor,1)})`:''),
-      peso:x.ind.peso, val:x.ating}));
+    r.itens.forEach(x=>{
+      const frac=(x.ating!==null&&x.ind.peso)?x.ating/x.ind.peso:null;
+      const fx=frac===null?'sem lançamento':(frac>0?`faixa ${qN(frac*100,0)}%`:'nenhuma faixa (0%)');
+      const como = x.auto
+        ? `média proporcional dos setores (${x.auto.itens.map(i=>escapeHtml(i.setor)+' '+qN(i.val*100,2)+'%').join(' · ')}) = ${qN(x.media,2)}%`
+        : (x.valores?`${x.valores.map(v=>v===null?'—':vFmt(v,x.ind.formato)).join(' / ')} → média ${x.media===null?'—':qN(x.media,2)}`:'');
+      detalhe.push({txt:x.ind.nome, como:`${como} → ${fx} × peso ${qN(x.ind.peso*100,0)}%`, peso:x.ind.peso, val:x.ating});
+    });
     if(Math.abs(r.pesoTotal-c.pesoInd)>0.001) alertas.push(`Pesos dos indicadores somam ${qN(r.pesoTotal*100,0)}% (esperado ${qN(c.pesoInd*100,0)}%)`);
     if(r.pendentes.length) alertas.push('Sem lançamento: '+r.pendentes.join(', '));
     r.itens.filter(x=>x.auto).forEach(x=>x.auto.itens.filter(i=>i.faltando.length).forEach(i=>alertas.push(`${i.setor} sem resultado em ${i.faltando.join(', ')} (conta 0)`)));
   } else {
-    const setores=p.setores||[];
-    if(!setores.length) return {erro:'Sem setores'};
-    const vals=setores.map(s=>{
-      const quem=qQuemCobre(s,mod).filter(q=>q.id!==p.id);
-      if(quem.length){
-        const vals=quem.map(q=>qResultadoProprios(q,mod).pts);
-        const m=vals.reduce((a,v)=>a+v,0)/vals.length;
-        const txt = quem.length===1 ? `${s} → ${quem[0].nome}`
-          : `${s} → média de ${quem.map((q,i)=>`${q.nome} (${qN(vals[i]*100,1)}%)`).join(' e ')}`;
-        detalhe.push({txt, val:m, sub:true});
-        return m;
-      }
-      const r=qResSetorCiclo(s,mod);
-      if(r.faltando.length) alertas.push(`${s} sem resultado em ${r.faltando.join(', ')} (conta 0)`);
-      detalhe.push({txt:s, val:r.val});
-      return r.val;
-    });
-    const media=vals.reduce((a,v)=>a+v,0)/vals.length;
-    detalhe.push({txt:'Média dos setores', val:media, media:true});
-    indPts=media*c.pesoInd;
+    if(!(p.setores||[]).length) return {erro:'Sem setores'};
+    const ms=qMediaSetores(p,mod);
+    ms.detalhe.forEach(d=>detalhe.push(d)); ms.alertas.forEach(a=>alertas.push(a));
+    detalhe.push({txt:'Média dos setores', val:ms.media, media:true});
+    indPts=ms.media*c.pesoInd;
   }
   const deg=qFatDegrau(mod); const fatPts=deg/100*c.pesoFat;
   const final=Math.max(0, indPts+fatPts);
@@ -5289,7 +5352,7 @@ function qRenderPessoasTabela(){
         : '<span style="color:var(--red)">sem grupo</span>';
     } else {
       const per=p.periodicidade||'trimestral';
-      comp=(p.setores||[]).map(s=>{ const q=qQuemCobre(s,per); return q.length?`${escapeHtml(s)} <span style="color:var(--text3)">→ ${q.length>1?'média de ':''}${q.map(x=>escapeHtml(x.nome)).join(' e ')}</span>`:escapeHtml(s); }).join('<br>')||'<span style="color:var(--red)">sem setores</span>';
+      comp=(p.setores||[]).map(s=>{ const q=qCobertores(s,qRank(p),per).filter(x=>x.id!==p.id); return q.length?`${escapeHtml(s)} <span style="color:var(--text3)">→ ${q.length>1?'média de ':''}${q.map(x=>escapeHtml(x.nome)).join(' e ')}</span>`:escapeHtml(s); }).join('<br>')||'<span style="color:var(--red)">sem setores</span>';
     }
     return `<tr style="${p.ativo===false?'opacity:.5':''}">
       <td class="mono">${escapeHtml(p.ref||'—')}</td>
@@ -5450,12 +5513,6 @@ function qRenderPagResultado(){
     if(r.erro) return `<tr><td style="font-weight:600">${escapeHtml(p.nome)}</td><td colspan="8" style="color:var(--red)">${r.erro} — ajuste em "Pessoas e cargos"</td></tr>`;
     total+=r.pago; if(r.pago>0) recebem++; else zerados++;
     const cor=r.pago>0?(r.situacao==='OK'?'badge-green':'badge-amber'):'badge-red';
-    const det=r.detalhe.map(d=>`<div style="display:flex;justify-content:space-between;gap:16px;${d.media?'border-top:1px solid var(--border);margin-top:4px;padding-top:4px;font-weight:700':''}">
-        <span>${d.sub?'↳ ':''}${escapeHtml(d.txt)}${d.peso!==undefined?` <span style="color:var(--text3)">(peso ${qN(d.peso*100,0)}%)</span>`:''}</span>
-        <span class="mono">${d.val===null||d.val===undefined?'—':(d.peso!==undefined?qN(d.val*100,1)+' pts':qN(d.val*100,1)+'%')}</span></div>`).join('');
-    const conta=r.c.tipo==='media'
-      ? `média ${qN(r.indPts/r.c.pesoInd*100,1)}% × ${qN(r.c.pesoInd*100,0)}% = ${qN(r.indPts*100,2)} pts`
-      : `soma dos indicadores = ${qN(r.indPts*100,2)} pts`;
     return `<tr style="cursor:pointer" onclick="qTogglePagDet(${ix})">
       <td style="font-weight:600">${escapeHtml(p.nome)}${r.alertas.length?` <span title="${escapeHtml(r.alertas.join(' · '))}" style="color:var(--amber)">⚠</span>`:''}</td>
       <td><span class="badge ${r.c.tipo==='media'?'badge-blue':'badge-green'}">${r.c.nome}</span></td>
@@ -5468,11 +5525,7 @@ function qRenderPagResultado(){
       <td><span class="badge ${cor}">${r.situacao}</span></td>
     </tr>
     <tr class="q-pdet-${ix}" style="display:none;background:var(--hover)"><td colspan="9" style="padding:12px 18px">
-      <div style="max-width:620px;font-size:12.5px;line-height:1.7">${det}
-        <div style="margin-top:8px;color:var(--text2)">Indicadores: ${conta} · Faturamento: degrau ${r.fatDeg}% × ${qN(r.c.pesoFat*100,0)}% = ${qN(r.fatPts*100,2)} pts</div>
-        <div style="color:var(--text2)">R$ ${pBRL(r.premio100)} × ${qN(r.final*100,2)}% × proporcional ${qN(r.prop*100,1)}%${r.o.adv===1?' × 50% (advertência)':''} = <b>R$ ${pBRL(r.pago)}</b></div>
-        ${r.alertas.length?`<div style="margin-top:8px;color:var(--amber)">⚠ ${r.alertas.map(escapeHtml).join('<br>⚠ ')}</div>`:''}
-      </div></td></tr>`;
+      ${qMemoriaHTML(p,r,true)}</td></tr>`;
   });
   tb.innerHTML=rows.join('')||'<tr><td colspan="9" class="empty-state">Nenhuma pessoa neste ciclo.</td></tr>';
   const k=$('q-pag-kpis');
@@ -5499,9 +5552,6 @@ function qRenderPainelPessoas(){
     const r=qCalcPessoa(p,qMod);
     if(r.erro) return `<tr><td style="font-weight:600">${escapeHtml(p.nome)}</td><td colspan="5" style="color:var(--red)">${r.erro}</td></tr>`;
     soma+=r.final; n++; if(r.final>=0.85) acima++;
-    const det=r.detalhe.map(d=>`<div style="display:flex;justify-content:space-between;gap:16px;${d.media?'border-top:1px solid var(--border);margin-top:4px;padding-top:4px;font-weight:700':''}">
-        <span>${d.sub?'↳ ':''}${escapeHtml(d.txt)}${d.peso!==undefined?` <span style="color:var(--text3)">(peso ${qN(d.peso*100,0)}%)</span>`:''}</span>
-        <span class="mono">${d.val===null||d.val===undefined?'—':(d.peso!==undefined?qN(d.val*100,1)+' pts':qN(d.val*100,1)+'%')}</span></div>`).join('');
     return `<tr style="cursor:pointer" onclick="document.querySelectorAll('.q-ppdet-${ix}').forEach(x=>x.style.display=x.style.display==='none'?'table-row':'none')">
       <td style="font-weight:600">${escapeHtml(p.nome)}${r.alertas.length?` <span title="${escapeHtml(r.alertas.join(' · '))}" style="color:var(--amber)">⚠</span>`:''}</td>
       <td><span class="badge ${r.c.tipo==='media'?'badge-blue':'badge-green'}">${r.c.nome}</span></td>
@@ -5509,8 +5559,7 @@ function qRenderPainelPessoas(){
       <td class="mono">${r.fatDeg}% → ${qN(r.fatPts*100,2)} pts</td>
       <td class="mono" style="font-weight:800;color:${r.final>=0.85?'var(--green)':r.final>0?'var(--amber)':'var(--red)'}">${qN(r.final*100,2)}%</td>
       <td>${vStatusBadge(r.final)}</td></tr>
-      <tr class="q-ppdet-${ix}" style="display:none;background:var(--hover)"><td colspan="6" style="padding:12px 18px"><div style="max-width:620px;font-size:12.5px;line-height:1.7">${det}
-        ${r.alertas.length?`<div style="margin-top:8px;color:var(--amber)">⚠ ${r.alertas.map(escapeHtml).join('<br>⚠ ')}</div>`:''}</div></td></tr>`;
+      <tr class="q-ppdet-${ix}" style="display:none;background:var(--hover)"><td colspan="6" style="padding:12px 18px">${qMemoriaHTML(p,r,false)}</td></tr>`;
   }).join('')||'<tr><td colspan="6" class="empty-state">Nenhuma pessoa cadastrada para este filtro. Cadastre em "Pessoas e cargos".</td></tr>';
   const k=$('q-painel-kpis');
   if(k) k.innerHTML=`
@@ -5518,6 +5567,40 @@ function qRenderPainelPessoas(){
     <div class="stat-card"><div class="stat-label">Acima de 85%</div><div class="stat-value" style="color:var(--green)">${acima}</div><div class="stat-sub">de ${n} pessoa(s)</div></div>
     <div class="stat-card"><div class="stat-label">Faturamento</div><div class="stat-value">${qFatDegrau(qMod)}%</div><div class="stat-sub">degrau do trimestre</div></div>
     <div class="stat-card"><div class="stat-label">Trimestre</div><div class="stat-value" style="font-size:22px">${qCicloLabel()}</div><div class="stat-sub">referência</div></div>`;
+}
+/* ---------- memória de cálculo (explicação passo a passo, para os gestores) ---------- */
+function qMemoriaHTML(p, r, comRS){
+  const linha=(esq,dir,extra)=>`<div style="display:flex;justify-content:space-between;gap:16px;${extra||''}"><span>${esq}</span><span class="mono" style="white-space:nowrap">${dir}</span></div>`;
+  const sub=t=>t?`<div style="font-size:11.5px;color:var(--text2);margin:-2px 0 6px 14px">${t}</div>`:'';
+  const tit=t=>`<div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--titulo);margin:12px 0 4px">${t}</div>`;
+  let h='';
+  const itens=r.detalhe.filter(d=>!d.media);
+  if(r.c.tipo==='media' && !qUsaProprios(p)){
+    h+=tit(`1 · Setores (${itens.length})`);
+    itens.forEach(d=>{ h+=linha(`${d.sub?'↳ ':''}${escapeHtml(d.txt)}`, `${qN(d.val*100,2)}%`); h+=sub(d.como?escapeHtml(d.como):''); });
+    const media=r.indPts/r.c.pesoInd;
+    h+=tit('2 · Média dos setores');
+    h+=linha(`(${itens.map(d=>qN(d.val*100,2)).join(' + ')}) ÷ ${itens.length}`, `<b>${qN(media*100,2)}%</b>`);
+    h+=linha(`× peso ${r.c.nome} ${qN(r.c.pesoInd*100,0)}%`, `<b>${qN(r.indPts*100,2)} pts</b>`);
+  } else {
+    h+=tit('1 · Indicadores');
+    itens.forEach(d=>{ h+=linha(escapeHtml(d.txt), d.val===null||d.val===undefined?'—':`${qN(d.val*100,2)} pts`); h+=sub(d.como||''); });
+    h+=tit('2 · Soma dos indicadores');
+    h+=linha(itens.map(d=>qN((d.val||0)*100,2)).join(' + '), `<b>${qN(r.indPts*100,2)} pts</b>`);
+  }
+  const fm=qFatMedia(qMod);
+  h+=tit('3 · Faturamento');
+  h+=linha(`média ${fm===null?'—':qN(fm,2)+'%'} → degrau ${r.fatDeg}% (faixas ${(qDB.fatFaixas||[]).join(' / ')}) × peso ${qN(r.c.pesoFat*100,0)}%`, `<b>${qN(r.fatPts*100,2)} pts</b>`);
+  h+=tit('4 · Resultado');
+  h+=linha(`${qN(r.indPts*100,2)} + ${qN(r.fatPts*100,2)}`, `<b style="font-size:14px">${qN(r.final*100,2)}%</b>`);
+  if(comRS){
+    h+=tit('5 · Valor');
+    h+=linha(`Prêmio a 100%: base R$ ${pBRL(r.c.base)} × ${qN(r.c.mult,1)} ÷ 12 × ${r.c.meses}`, `R$ ${pBRL(r.premio100)}`);
+    h+=linha(`Proporcional: (${r.o.dias} dias − ${r.o.atestados} atestados) ÷ ${qDB.cfg.divisor}`, `${qN(r.prop*100,2)}%`);
+    h+=linha(`R$ ${pBRL(r.premio100)} × ${qN(r.final*100,2)}% × ${qN(r.prop*100,2)}%${r.o.adv===1?' × 50% (1 advertência)':''}${r.pago===0&&r.situacao!=='OK'&&r.situacao!=='PROPORCIONAL'?' → zerado ('+r.situacao.toLowerCase()+')':''}`, `<b style="font-size:14px">R$ ${pBRL(r.pago)}</b>`, 'border-top:1px solid var(--border);padding-top:4px;margin-top:4px');
+  }
+  if(r.alertas.length) h+=`<div style="margin-top:10px;color:var(--amber)">⚠ ${r.alertas.map(escapeHtml).join('<br>⚠ ')}</div>`;
+  return `<div style="max-width:760px;font-size:12.5px;line-height:1.7">${h}</div>`;
 }
 function qTogglePagDet(ix){ document.querySelectorAll('.q-pdet-'+ix).forEach(r=>r.style.display=r.style.display==='none'?'table-row':'none'); }
 
@@ -5567,18 +5650,18 @@ function qExportarConferencia(){
   qMemoReset();
   const r2=v=>Math.round((v||0)*100)/100;
   const head=['Ref.','Nome','Cargo','Pts indicadores','Faturamento (degrau %)','Pts faturamento','Resultado %','Base R$','Mult.','Meses','Prêmio a 100% R$','Dias','Atestados','Faltas','Advertências','Suspensão','Proporcional %','Valor a pagar R$','Situação','Alertas'];
-  const det=[['Nome','Cargo','Item','Peso','Valor']];
+  const det=[['Nome','Cargo','Item','Como foi calculado','Peso','Valor (pts ou %)']];
   const linhas=qPessoasAtivas(qMod).map(p=>{
     const r=qCalcPessoa(p,qMod);
     if(r.erro) return [p.ref,p.nome,p.cargo,'','','','','','','','','','','','','','','',r.erro,''];
-    r.detalhe.forEach(d=>det.push([p.nome,r.c.nome,(d.sub?'↳ ':'')+d.txt,d.peso!==undefined?d.peso:'',d.val===null||d.val===undefined?'':r2(d.val*100)]));
+    r.detalhe.forEach(d=>det.push([p.nome,r.c.nome,(d.sub?'↳ ':'')+d.txt,String(d.como||'').replace(/<[^>]+>/g,''),d.peso!==undefined?d.peso:'',d.val===null||d.val===undefined?'':r2(d.val*100)]));
     return [p.ref,p.nome,r.c.nome,r2(r.indPts*100),r.fatDeg,r2(r.fatPts*100),r2(r.final*100),r.c.base,r.c.mult,r.c.meses,r2(r.premio100),
       r.o.dias,r.o.atestados,r.o.faltas,r.o.adv,r.o.susp,r2(r.prop*100),r.pago,r.situacao,r.alertas.join(' | ')];
   });
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet([head,...linhas]); ws['!cols']=head.map((h,i)=>({wch:i===1?30:i===19?60:13}));
   XLSX.utils.book_append_sheet(wb,ws,'Cálculo');
-  const wd=XLSX.utils.aoa_to_sheet(det); wd['!cols']=[{wch:30},{wch:14},{wch:60},{wch:8},{wch:10}];
+  const wd=XLSX.utils.aoa_to_sheet(det); wd['!cols']=[{wch:30},{wch:14},{wch:40},{wch:90},{wch:8},{wch:12}];
   XLSX.utils.book_append_sheet(wb,wd,'Composição');
   const meses=qMeses();
   const fat=[['Mês','% atingimento da meta'],...meses.map(m=>[`${vNomeMes(m.mes)}/${m.ano}`, qDB.fatMeta[m.pkey]??'']),['Média',r2(qFatMedia()||0)],['Degrau',qFatDegrau()]];
