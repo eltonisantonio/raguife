@@ -4736,7 +4736,7 @@ function renderQLancTable(){
     <tr><td colspan="2" style="font-weight:600;color:var(--text2);font-size:12px">Total do setor</td><td class="mono" style="font-weight:700">${(totalPeso*100).toFixed(0)}%</td>
     <td colspan="${5+meses.length}"></td>
     <td class="mono" style="font-weight:800;font-size:15px;color:${finalPct===null?'var(--text3)':finalPct>=0.85?'var(--green)':finalPct>0?'var(--amber)':'var(--red)'}">${finalPct!==null?(finalPct*100).toFixed(1)+'%':'—'}</td></tr>
-    <tr><td colspan="3" style="font-size:11px;color:var(--text3)">+ Faturamento (degrau do ciclo)</td><td colspan="${6+meses.length}" style="font-size:11px;color:var(--text3)">${fatMedia!==null?'média '+qN(fatMedia,1)+'% → degrau '+fatDeg+'% × 20% = +'+qN(fatContrib*100,1)+' pts (Gerente: ×25%)':'sem faturamento lançado pelo RH ainda'}</td></tr>
+    <tr><td colspan="3" style="font-size:11px;color:var(--text3)">+ Faturamento (degrau do ciclo)</td><td colspan="${6+meses.length}" style="font-size:11px;color:var(--text3)">${fatMedia!==null?'média '+qN(fatMedia,1)+'% → degrau '+fatDeg+'% (faixas '+(qDB.fatFaixas||[]).join(' / ')+') × 20% = +'+qN(fatContrib*100,1)+' pts (Gerente: ×25%)':'sem faturamento lançado pelo RH ainda'}</td></tr>
   </tfoot></table></div>`;
   $('q-lanc-tabs').innerHTML=tabs;
   $('q-lanc-content').innerHTML=html;
@@ -5061,6 +5061,10 @@ function qIndsGrupo(g, mod){
   return qDB.indicadores.filter(i=>i.setor===g.setor && i.periodicidade===mod
     && (!i.turno || i.turno===g.turno) && (!i.funcao || i.funcao===g.funcao));
 }
+/* Supervisor/Especialista sempre usam indicadores próprios.
+   Coordenador/Gerente usam a média dos setores do Mensal, ou — quando marcado
+   (p.modo='proprios') — indicadores próprios do Periódico, como Compras de Insumos. */
+function qUsaProprios(p){ const c=qCargo(p.cargo); return !!c && (c.tipo==='proprios' || p.modo==='proprios'); }
 function qGrupoDe(p){ const [setor,turno,funcao]=(p.grupo||'').split('||'); return {setor:setor||'',turno:turno||'',funcao:funcao||''}; }
 function qPessoasAtivas(mod){ return (qDB.pessoas||[]).filter(p=>p.ativo!==false && (p.periodicidade||'trimestral')===mod); }
 
@@ -5082,14 +5086,17 @@ function qResultadoProprios(p, mod){
 /* supervisor/especialista que cobre um setor do Mensal (pelo indicador automático) */
 function qQuemCobre(setor, mod){
   return qPessoasAtivas(mod).filter(p=>{
-    const c=qCargo(p.cargo); if(!c||c.tipo!=='proprios') return false;
-    return qIndsGrupo(qGrupoDe(p),mod).some(i=>i.auto && (i.autoSetores||[]).includes(setor));
+    const c=qCargo(p.cargo); if(!c||!p.grupo) return false;
+    if(c.tipo==='proprios')
+      return qIndsGrupo(qGrupoDe(p),mod).some(i=>i.auto && (i.autoSetores||[]).includes(setor));
+    // Coordenador/Gerente com indicadores próprios: cobre o setor do próprio grupo
+    return p.modo==='proprios' && qGrupoDe(p).setor===setor;
   });
 }
 function qCalcPessoa(p, mod){
   const c=qCargo(p.cargo); if(!c) return {erro:'Cargo não cadastrado'};
   const alertas=[]; let indPts=0; const detalhe=[];
-  if(c.tipo==='proprios'){
+  if(qUsaProprios(p)){
     if(!p.grupo) return {erro:'Sem grupo de indicadores'};
     const r=qResultadoProprios(p,mod);
     indPts=r.pts;
@@ -5244,8 +5251,14 @@ function renderQPessoas(){
         <div class="field"><label>Cargo</label><select id="qp-cargo" onchange="qPesToggle()">${Q_CARGOS.map(id=>`<option value="${id}">${qDB.cargos[id].nome}</option>`).join('')}</select></div>
         <div class="field" style="display:none"><label>Ciclo</label><select id="qp-per"><option value="trimestral">Trimestral</option><option value="semestral">Semestral</option><option value="anual">Anual</option></select></div>
       </div>
+      <div class="field" id="qp-modo-box"><label>O resultado vem de</label>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:4px">
+          <label class="check"><input type="radio" name="qp-modo" value="setores" onchange="qPesToggle()"> Média dos setores do Prêmios Mensais</label>
+          <label class="check"><input type="radio" name="qp-modo" value="proprios" onchange="qPesToggle()"> Indicadores próprios do Periódico</label>
+        </div>
+        <div class="card-sub" style="margin-top:6px">Use "indicadores próprios" para setores sem metas mensais (ex.: Compras de Insumos). Quem estiver acima no mesmo setor passa a usar o resultado dessa pessoa.</div></div>
       <div class="field" id="qp-grupo-box"><label>Grupo de indicadores (cadastrado no Periódico)</label><select id="qp-grupo"></select>
-        <div class="card-sub" style="margin-top:6px">Os setores que essa pessoa cobre vêm do indicador automático do grupo.</div></div>
+        <div class="card-sub" style="margin-top:6px" id="qp-grupo-hint">Os setores que essa pessoa cobre vêm do indicador automático do grupo.</div></div>
       <div class="field" id="qp-setores-box"><label>Setores sob responsabilidade</label>
         <div id="qp-setores" class="checks" style="max-height:220px;overflow:auto;border:1px solid var(--border);padding:8px"></div></div>
       <label class="check"><input type="checkbox" id="qp-ativo" checked> Ativo</label>
@@ -5254,7 +5267,13 @@ function renderQPessoas(){
   qRenderPessoasTabela();
 }
 function qSetCargo(id,campo,val){ const n=parseFloat(String(val).replace(',','.')); if(isNaN(n)) return; qDB.cargos[id][campo]=n; qSave(); renderQPessoas(); }
-function qSetFaixa(i,val){ const n=parseFloat(String(val).replace(',','.')); if(isNaN(n)) return; qDB.fatFaixas[i]=n; qSave(); }
+function qSetFaixa(i,val){
+  const n=parseFloat(String(val).replace(',','.'));
+  const f=qDB.fatFaixas.slice(); f[i]=n;
+  if(isNaN(n)||n<=0||n>200){ toast('Faixa inválida — use o % de atingimento (ex.: 85)','error'); renderQPessoas(); return; }
+  for(let k=1;k<4;k++) if(f[k]<=f[k-1]){ toast('As faixas devem ser crescentes (ex.: 85 / 90 / 95 / 100)','error'); renderQPessoas(); return; }
+  qDB.fatFaixas=f; qSave();
+}
 function qRenderPessoasTabela(){
   const tb=$('q-pes-tbody'); if(!tb) return;
   qMemoReset();
@@ -5262,11 +5281,11 @@ function qRenderPessoasTabela(){
   tb.innerHTML=lista.map(p=>{
     const c=qCargo(p.cargo)||{nome:p.cargo};
     let comp='';
-    if(c.tipo==='proprios'){
+    if(qUsaProprios(p)){
       const g=qGrupoDe(p); const per=p.periodicidade||'trimestral';
       const auto=qIndsGrupo(g,per).filter(i=>i.auto);
       comp = p.grupo ? `<b>${escapeHtml(g.setor)}${g.funcao?' / '+escapeHtml(g.funcao):''}</b>`+
-        (auto.length?`<div style="font-size:11px;color:var(--text2)">cobre: ${auto.flatMap(i=>i.autoSetores||[]).map(escapeHtml).join(', ')}</div>`:'<div style="font-size:11px;color:var(--amber)">grupo sem indicador automático</div>')
+        (c.tipo==='media'?`<div style="font-size:11px;color:var(--text2)">indicadores próprios · cobre: ${escapeHtml(g.setor)}</div>`:auto.length?`<div style="font-size:11px;color:var(--text2)">cobre: ${auto.flatMap(i=>i.autoSetores||[]).map(escapeHtml).join(', ')}</div>`:'<div style="font-size:11px;color:var(--amber)">grupo sem indicador automático</div>')
         : '<span style="color:var(--red)">sem grupo</span>';
     } else {
       const per=p.periodicidade||'trimestral';
@@ -5282,10 +5301,16 @@ function qRenderPessoasTabela(){
     </tr>`;
   }).join('')||'<tr><td colspan="6" class="empty-state">Nenhuma pessoa cadastrada ainda.</td></tr>';
 }
+function qPesModo(){ const r=document.querySelector('input[name="qp-modo"]:checked'); return r?r.value:'setores'; }
 function qPesToggle(){
   const c=qCargo($('qp-cargo').value);
-  $('qp-grupo-box').style.display = c.tipo==='proprios'?'block':'none';
-  $('qp-setores-box').style.display = c.tipo==='media'?'block':'none';
+  const proprios = c.tipo==='proprios' || qPesModo()==='proprios';
+  $('qp-modo-box').style.display = c.tipo==='media'?'block':'none';
+  $('qp-grupo-box').style.display = proprios?'block':'none';
+  $('qp-setores-box').style.display = proprios?'none':'block';
+  $('qp-grupo-hint').textContent = c.tipo==='proprios'
+    ? 'Os setores que essa pessoa cobre vêm do indicador automático do grupo.'
+    : `Os pesos do grupo devem somar ${qN(c.pesoInd*100,0)}%. Esta pessoa substitui o setor do grupo no resultado de quem está acima.`;
 }
 function qAbrirPessoa(id){
   const p = id ? qDB.pessoas.find(x=>x.id===id) : null;
@@ -5295,6 +5320,7 @@ function qAbrirPessoa(id){
   $('qp-cargo').value = p?p.cargo:'supervisor';
   $('qp-per').value = p?(p.periodicidade||'trimestral'):'trimestral';
   $('qp-ativo').checked = p?p.ativo!==false:true;
+  document.querySelectorAll('input[name="qp-modo"]').forEach(r=>r.checked = r.value===((p&&p.modo)||'setores'));
   const grupos=qGruposPeriodico($('qp-per').value);
   $('qp-grupo').innerHTML='<option value="">— escolha —</option>'+grupos.map(g=>`<option value="${escapeHtml(g.key)}" ${p&&p.grupo===g.key?'selected':''}>${escapeHtml(g.label)}</option>`).join('');
   const sel=p?(p.setores||[]):[];
@@ -5302,7 +5328,10 @@ function qAbrirPessoa(id){
   const grupo=(mod,tit)=>{ const l=lista.filter(x=>x.mod===mod); if(!l.length) return '';
     return `<div style="width:100%;font-size:11px;font-weight:700;color:var(--text2);margin:4px 0">${tit}</div>`+
       l.map(x=>`<label class="check"><input type="checkbox" class="qp-set-chk" value="${escapeHtml(x.nome)}" ${sel.includes(x.nome)?'checked':''}> ${escapeHtml(x.nome)}</label>`).join(''); };
-  $('qp-setores').innerHTML=grupo('adm','Administrativo')+grupo('industria','Operação');
+  const noMensal=new Set(lista.map(x=>x.nome));
+  const soPer=[...new Set((qDB.pessoas||[]).filter(x=>x.modo==='proprios'&&x.grupo).map(x=>qGrupoDe(x).setor))].filter(st=>!noMensal.has(st));
+  soPer.forEach(st=>lista.push({nome:st,mod:'periodico'}));
+  $('qp-setores').innerHTML=grupo('adm','Administrativo')+grupo('industria','Operação')+grupo('periodico','Só no Periódico (coordenador com indicadores próprios)');
   qPesToggle();
   $('q-modal-pes').classList.add('show');
 }
@@ -5312,7 +5341,8 @@ function qSalvarPessoa(){
     periodicidade:$('qp-per').value, ativo:$('qp-ativo').checked };
   if(!dados.ref||!dados.nome){ toast('Informe referência e nome','error'); return; }
   const c=qCargo(dados.cargo);
-  if(c.tipo==='proprios'){ dados.grupo=$('qp-grupo').value; dados.setores=[]; if(!dados.grupo){ toast('Escolha o grupo de indicadores','error'); return; } }
+  dados.modo = c.tipo==='media' ? qPesModo() : '';
+  if(c.tipo==='proprios' || dados.modo==='proprios'){ dados.grupo=$('qp-grupo').value; dados.setores=[]; if(!dados.grupo){ toast('Escolha o grupo de indicadores','error'); return; } }
   else { dados.setores=[...document.querySelectorAll('.qp-set-chk:checked')].map(x=>x.value); dados.grupo=''; if(!dados.setores.length){ toast('Marque ao menos um setor','error'); return; } }
   if(qDB.pessoas.some(x=>x.id!==id && String(x.ref)===dados.ref && x.ativo!==false && (x.periodicidade||'trimestral')===dados.periodicidade)){ toast('Já existe pessoa ativa com essa referência','error'); return; }
   if(id){ const i=qDB.pessoas.findIndex(x=>x.id===id); qDB.pessoas[i]={...qDB.pessoas[i],...dados}; }
