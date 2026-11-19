@@ -1314,7 +1314,7 @@ function renderVarCadastros(){
   if(!currentUser.admin){ $('var-content').innerHTML='<div class="empty-state">Cadastros é restrito ao administrador.</div>'; return; }
   const ed = vCanEdit();
   const aviso = ed ? '' : `<div class="card" style="border-color:#f5d9a8;background:#fffbeb"><div style="font-size:13px;color:var(--amber)">Somente administradores editam os cadastros. Você está visualizando.</div></div>`;
-  const adminCard = ed ? `<div class="card"><h3>Backup e importação de histórico</h3><div class="card-sub">Exporte os dados atuais ou importe um .json do sistema antigo. Importar substitui os dados do Variável.</div><div class="add-row"><button class="btn btn-ghost" onclick="vExportarDados()">Exportar backup (.json)</button><label class="btn btn-primary" style="cursor:pointer">Importar .json<input type="file" accept=".json,application/json" onchange="vImportarDados(this)" style="display:none"></label></div></div>` : '';
+  const adminCard = ed ? `<div class="card"><h3>Backup e importação de histórico</h3><div class="card-sub">Exporte os dados atuais ou importe um .json do sistema antigo. Importar substitui os dados do Variável.</div><div class="add-row"><button class="btn btn-ghost" onclick="vExportarDados()">Exportar backup (.json)</button><button class="btn btn-primary" onclick="vExportarIndicadoresXlsx()">Exportar indicadores (.xlsx)</button><label class="btn btn-primary" style="cursor:pointer">Importar .json<input type="file" accept=".json,application/json" onchange="vImportarDados(this)" style="display:none"></label></div></div>` : '';
   $('var-content').innerHTML = `
     ${aviso}${adminCard}
     <div class="grid2">
@@ -1375,6 +1375,21 @@ function vRenderTurnos(){
   tt.innerHTML = varDB.turnos.map((t,i)=>
     `<tr><td style="font-size:13px">${t}</td>${ed?`<td style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="vEditarTurno(${i})">Editar</button><button class="btn btn-danger btn-sm" onclick="vRemoverTurno(${i})">Remover</button></td>`:''}</tr>`
   ).join('') || `<tr><td colspan="2" class="empty-state">Nenhum turno</td></tr>`;
+}
+function vExportarIndicadoresXlsx(){
+  const mod={adm:'ADM',industria:'INDÚSTRIA'};
+  const inds=[...varDB.indicadores].sort((a,b)=>(a.modulo!==b.modulo?(a.modulo==='adm'?-1:1):0)||String(a.setor).localeCompare(a.setor===b.setor?'':b.setor)||String(a.turno||'').localeCompare(b.turno||'')||a.id-b.id);
+  const H=['ID','Módulo','Setor','Turno','Função','Indicador','Sentido','Formato','Periodicidade','Peso (%)','Faixa 85%','Faixa 90%','Faixa 95%','Faixa 100%'];
+  const v=x=>(x===null||x===undefined||x==='')?'':x;
+  const rows=inds.map(i=>[i.id,mod[i.modulo]||i.modulo,i.setor,i.turno||'',i.funcao||'',i.nome,i.sentido==='maior'?'Maior é melhor':'Menor é melhor',i.formato||'',i.periodicidade||'mensal',Math.round((i.peso||0)*10000)/100,v(i.m85),v(i.m90),v(i.m95),v(i.m100)]);
+  const ws=XLSX.utils.aoa_to_sheet([H,...rows]);
+  ws['!cols']=[6,12,26,24,14,52,16,11,14,10,11,11,11,11].map(w=>({wch:w}));
+  const g={};inds.forEach(i=>{const k=[mod[i.modulo]||i.modulo,i.setor,i.turno||'',i.funcao||''].join('|');g[k]=(g[k]||0)+(i.peso||0);});
+  const P=[['Módulo','Setor','Turno','Função','Soma dos pesos (%)'],...Object.keys(g).map(k=>[...k.split('|'),Math.round(g[k]*10000)/100])];
+  const wp=XLSX.utils.aoa_to_sheet(P);wp['!cols']=[12,28,26,14,18].map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Indicadores');XLSX.utils.book_append_sheet(wb,wp,'Soma de pesos');
+  XLSX.writeFile(wb,'Indicadores_Faixas_Pesos.xlsx');
+  toast('Planilha gerada');
 }
 function vRenderIndicadores(){
   const ed=vCanEdit();
